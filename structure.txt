@@ -1,0 +1,111 @@
+99acres-backend/
+├── src/
+│   ├── config/
+│   │   ├── database.js
+│   │   ├── redis.js
+│   │   ├── aws.js
+│   │   └── razorpay.js
+│   │
+│   ├── modules/
+│   │   ├── auth/
+│   │   │   ├── auth.model.js
+│   │   │   ├── auth.controller.js
+│   │   │   ├── auth.routes.js
+│   │   │   ├── auth.middleware.js
+│   │   │   └── auth.validation.js
+│   │   │
+│   │   ├── users/
+│   │   │   ├── user.model.js
+│   │   │   ├── user.controller.js
+│   │   │   ├── user.routes.js
+│   │   │   └── user.service.js
+│   │   │
+│   │   ├── properties/
+│   │   │   ├── property.model.js
+│   │   │   ├── property.controller.js
+│   │   │   ├── property.routes.js
+│   │   │   ├── property.service.js
+│   │   │   └── property.validation.js
+│   │   │
+│   │   ├── search/
+│   │   │   ├── search.controller.js
+│   │   │   ├── search.routes.js
+│   │   │   ├── search.service.js
+│   │   │   └── search.filters.js
+│   │   │
+│   │   ├── leads/
+│   │   │   ├── lead.model.js
+│   │   │   ├── lead.controller.js
+│   │   │   ├── lead.routes.js
+│   │   │   └── lead.service.js
+│   │   │
+│   │   ├── payments/
+│   │   │   ├── subscription.model.js
+│   │   │   ├── transaction.model.js
+│   │   │   ├── payment.controller.js
+│   │   │   ├── payment.routes.js
+│   │   │   └── razorpay.service.js
+│   │   │
+│   │   ├── insights/
+│   │   │   ├── insights.controller.js
+│   │   │   ├── insights.routes.js
+│   │   │   ├── priceTrend.service.js
+│   │   │   └── calculator.service.js
+│   │   │
+│   │   ├── content/
+│   │   │   ├── article.model.js
+│   │   │   ├── content.controller.js
+│   │   │   ├── content.routes.js
+│   │   │   └── content.service.js
+│   │   │
+│   │   └── admin/
+│   │       ├── admin.controller.js
+│   │       ├── admin.routes.js
+│   │       ├── admin.middleware.js
+│   │       └── dashboard.service.js
+│   │
+│   ├── middlewares/
+│   │   ├── auth.middleware.js
+│   │   ├── role.middleware.js
+│   │   ├── rateLimiter.js
+│   │   ├── errorHandler.js
+│   │   ├── upload.middleware.js
+│   │   └── validation.middleware.js
+│   │
+│   ├── utils/
+│   │   ├── logger.js
+│   │   ├── responseHandler.js
+│   │   ├── emailService.js
+│   │   ├── smsService.js
+│   │   ├── helpers.js
+│   │   └── constants.js
+│   │
+│   ├── queues/
+│   │   ├── email.queue.js
+│   │   ├── image.queue.js
+│   │   └── index.queue.js
+│   │
+│   └── app.js
+│
+├── tests/
+│   ├── unit/
+│   ├── integration/
+│   └── fixtures/
+│
+├── scripts/
+│   ├── seed.js
+│   └── elasticsearch-sync.js
+│
+├── logs/
+│   └── .gitkeep
+│
+├── .env
+├── .env.example
+├── .eslintrc.js
+├── .prettierrc
+├── .gitignore
+├── Dockerfile
+├── docker-compose.yml
+├── package.json
+├── server.js
+└── README.md
