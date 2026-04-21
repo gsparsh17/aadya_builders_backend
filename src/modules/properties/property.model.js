@@ -20,7 +20,7 @@ const propertySchema = new mongoose.Schema({
     unique: true,
     index: true
   },
-  
+
   // Classification
   purpose: {
     type: String,
@@ -41,7 +41,7 @@ const propertySchema = new mongoose.Schema({
     enum: ['residential', 'commercial', 'agricultural', 'industrial'],
     default: 'residential'
   },
-  
+
   // Pricing
   price: {
     type: Number,
@@ -61,7 +61,7 @@ const propertySchema = new mongoose.Schema({
     default: 0
   },
   bookingAmount: Number,
-  
+
   // Area Details
   area: {
     value: {
@@ -78,7 +78,7 @@ const propertySchema = new mongoose.Schema({
   carpetArea: Number,
   builtupArea: Number,
   superBuiltupArea: Number,
-  
+
   // Configuration
   bedrooms: {
     type: Number,
@@ -102,7 +102,7 @@ const propertySchema = new mongoose.Schema({
     min: [0, 'Floor number cannot be negative']
   },
   unitNumber: String,
-  
+
   // Property Details
   furnishing: {
     type: String,
@@ -127,7 +127,7 @@ const propertySchema = new mongoose.Schema({
     enum: ['north', 'south', 'east', 'west', 'north_east', 'north_west', 'south_east', 'south_west']
   },
   overlooking: [String],
-  
+
   // Location
   location: {
     address: {
@@ -171,7 +171,7 @@ const propertySchema = new mongoose.Schema({
       }
     }
   },
-  
+
   // Amenities
   amenities: [{
     type: String,
@@ -184,7 +184,7 @@ const propertySchema = new mongoose.Schema({
       'service_lift', 'shopping_center', 'hospital', 'school'
     ]
   }],
-  
+
   // Media
   images: [{
     url: {
@@ -217,7 +217,7 @@ const propertySchema = new mongoose.Schema({
     description: String
   }],
   brochure: String, // PDF brochure URL
-  
+
   // Ownership & Legal
   owner: {
     type: mongoose.Schema.Types.ObjectId,
@@ -237,7 +237,7 @@ const propertySchema = new mongoose.Schema({
   },
   propertyTaxReceipt: String,
   occupancyCertificate: String,
-  
+
   // Additional Information
   availableFrom: Date,
   preferredTenants: [{
@@ -250,7 +250,7 @@ const propertySchema = new mongoose.Schema({
     smokingAllowed: { type: Boolean, default: false },
     visitorsAllowed: { type: Boolean, default: true }
   },
-  
+
   // Nearby Places
   nearbyPlaces: [{
     type: {
@@ -261,7 +261,7 @@ const propertySchema = new mongoose.Schema({
     distance: Number, // in km
     duration: Number // in minutes
   }],
-  
+
   // Status & Visibility
   status: {
     type: String,
@@ -278,7 +278,7 @@ const propertySchema = new mongoose.Schema({
     ref: 'User'
   },
   rejectionReason: String,
-  
+
   // Featured & Promoted
   isFeatured: {
     type: Boolean,
@@ -294,7 +294,7 @@ const propertySchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-  
+
   // Listing Plan
   listingPlan: {
     type: {
@@ -305,7 +305,7 @@ const propertySchema = new mongoose.Schema({
     purchasedAt: Date,
     expiresAt: Date
   },
-  
+
   // Metrics
   views: {
     type: Number,
@@ -339,13 +339,13 @@ const propertySchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
-  
+
   // Project Association (for builders)
   project: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Project'
   },
-  
+
   // SEO
   metaTitle: String,
   metaDescription: String,
@@ -355,13 +355,13 @@ const propertySchema = new mongoose.Schema({
     unique: true,
     lowercase: true
   },
-  
+
   // Expiry
   expiresAt: {
     type: Date,
     default: () => new Date(+new Date() + 90 * 24 * 60 * 60 * 1000) // 90 days
   }
-  
+
 }, {
   timestamps: true,
   toJSON: { virtuals: true },
@@ -369,7 +369,7 @@ const propertySchema = new mongoose.Schema({
 });
 
 // Virtual for display price
-propertySchema.virtual('displayPrice').get(function() {
+propertySchema.virtual('displayPrice').get(function () {
   if (this.purpose.includes('rent') || this.purpose.includes('lease')) {
     return `₹${this.price.toLocaleString('en-IN')}/month`;
   }
@@ -377,7 +377,7 @@ propertySchema.virtual('displayPrice').get(function() {
 });
 
 // Virtual for area in sqft
-propertySchema.virtual('areaInSqft').get(function() {
+propertySchema.virtual('areaInSqft').get(function () {
   const conversionRates = {
     sqft: 1,
     sqyrd: 9,
@@ -389,7 +389,7 @@ propertySchema.virtual('areaInSqft').get(function() {
 });
 
 // Virtual for full location
-propertySchema.virtual('fullLocation').get(function() {
+propertySchema.virtual('fullLocation').get(function () {
   const parts = [
     this.location.address,
     this.location.landmark,
@@ -402,86 +402,95 @@ propertySchema.virtual('fullLocation').get(function() {
 });
 
 // Virtual for primary image
-propertySchema.virtual('primaryImage').get(function() {
+propertySchema.virtual('primaryImage').get(function () {
   const primary = this.images.find(img => img.isPrimary);
   return primary?.url || this.images[0]?.url || null;
 });
 
-// Pre-save hook to generate property code
-propertySchema.pre('save', async function(next) {
-  if (!this.propertyCode) {
-    const prefix = this.purpose.substring(0, 1).toUpperCase();
+// Pre-save hook to generate property code, slug, and calculate fields
+propertySchema.pre('save', function () {
+  const property = this;
+
+  // Generate property code if not exists
+  if (!property.propertyCode) {
+    const prefix = property.purpose.substring(0, 1).toUpperCase();
+    const typePrefix = property.propertyType.substring(0, 2).toUpperCase();
     const timestamp = Date.now().toString().slice(-8);
     const random = Math.random().toString(36).substring(2, 6).toUpperCase();
-    this.propertyCode = `${prefix}${timestamp}${random}`;
+    property.propertyCode = `${prefix}${typePrefix}${timestamp}${random}`;
   }
-  
-  // Generate slug
-  if (!this.slug) {
-    const baseSlug = `${this.title}-${this.location.locality}-${this.location.city}`
+
+  // Generate slug if not exists
+  if (!property.slug) {
+    const baseSlug = `${property.title}-${property.location.locality}-${property.location.city}`
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '');
-    this.slug = `${baseSlug}-${this.propertyCode.toLowerCase()}`;
+    property.slug = `${baseSlug}-${property.propertyCode.toLowerCase()}`;
   }
-  
+
   // Calculate price per sqft
-  if (this.price && this.area?.value) {
-    this.pricePerSqft = Math.round(this.price / this.areaInSqft);
+  if (property.price && property.area?.value) {
+    const areaInSqft = property.areaInSqft; // Uses the virtual getter
+    if (areaInSqft > 0) {
+      property.pricePerSqft = Math.round(property.price / areaInSqft);
+    }
   }
-  
+
   // Calculate ranking score
-  this.calculateRankingScore();
-  
-  next();
+  if (typeof property.calculateRankingScore === 'function') {
+    property.calculateRankingScore();
+  }
+
+  // No next() call needed - synchronous pre-save hook
 });
 
 // Method to calculate ranking score
-propertySchema.methods.calculateRankingScore = function() {
+propertySchema.methods.calculateRankingScore = function () {
   let score = 0;
-  
+
   // Base score
   score += 100;
-  
+
   // Verification bonus
   if (this.isVerified) score += 50;
-  
+
   // Featured bonus
   if (this.isFeatured) score += 200;
-  
+
   // Premium bonus
   if (this.isPremium) score += 100;
-  
+
   // Listing plan bonus
   const planScores = { free: 0, basic: 30, premium: 70, featured: 150, builder_showcase: 200 };
   score += planScores[this.listingPlan?.type] || 0;
-  
+
   // Recency bonus (newer = higher)
   const daysSinceCreation = (Date.now() - this.createdAt) / (1000 * 60 * 60 * 24);
   if (daysSinceCreation < 30) {
     score += Math.floor(30 - daysSinceCreation);
   }
-  
+
   // Engagement bonus
   score += Math.min(this.views / 10, 20);
   score += Math.min(this.leads * 2, 30);
   score += Math.min(this.favorites * 3, 30);
-  
+
   // Image bonus
   score += Math.min(this.images.length * 5, 25);
-  
+
   this.rankingScore = Math.floor(score);
   return this.rankingScore;
 };
 
 // Method to increment views
-propertySchema.methods.incrementViews = async function() {
+propertySchema.methods.incrementViews = async function () {
   this.views += 1;
   return this.save();
 };
 
 // Method to track unique view
-propertySchema.methods.trackUniqueView = async function(userId) {
+propertySchema.methods.trackUniqueView = async function (userId) {
   // Implementation would use Redis for tracking unique views
   this.uniqueViews += 1;
   return this.save();
@@ -492,9 +501,9 @@ propertySchema.index({ purpose: 1, 'location.city': 1, status: 1 });
 propertySchema.index({ propertyCode: 1 });
 propertySchema.index({ slug: 1 });
 propertySchema.index({ 'location.coordinates': '2dsphere' });
-propertySchema.index({ 
-  title: 'text', 
-  description: 'text', 
+propertySchema.index({
+  title: 'text',
+  description: 'text',
   'location.locality': 'text',
   'location.city': 'text'
 }, {

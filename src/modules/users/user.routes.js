@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const userController = require('./user.controller');
-const { authMiddleware } = require('../../middlewares/auth.middleware');
+const {authMiddleware} = require('../../middlewares/auth.middleware');
 const { authorize } = require('../../middlewares/role.middleware');
 const uploadMiddleware = require('../../middlewares/upload.middleware');
 const { validate } = require('../../middlewares/validation.middleware');
@@ -12,18 +12,8 @@ router.use(authMiddleware);
 
 // ==================== Profile Routes ====================
 
-/**
- * @route   GET /api/v1/users/profile
- * @desc    Get current user profile
- * @access  Private
- */
 router.get('/profile', userController.getProfile);
 
-/**
- * @route   PUT /api/v1/users/profile
- * @desc    Update user profile
- * @access  Private
- */
 router.put('/profile',
   [
     body('name').optional().isLength({ min: 2, max: 50 }).withMessage('Name must be between 2 and 50 characters'),
@@ -32,19 +22,11 @@ router.put('/profile',
     body('address.city').optional().isString(),
     body('address.state').optional().isString(),
     body('address.pincode').optional().matches(/^\d{6}$/).withMessage('Invalid pincode'),
-    body('companyDetails.companyName').optional().isString(),
-    body('companyDetails.designation').optional().isString(),
-    body('companyDetails.gstNumber').optional().isString(),
     validate
   ],
   userController.updateProfile
 );
 
-/**
- * @route   PUT /api/v1/users/password
- * @desc    Change password
- * @access  Private
- */
 router.put('/password',
   [
     body('currentPassword').notEmpty().withMessage('Current password is required'),
@@ -54,38 +36,13 @@ router.put('/password',
   userController.changePassword
 );
 
-/**
- * @route   POST /api/v1/users/avatar
- * @desc    Upload profile picture
- * @access  Private
- */
 router.post('/avatar',
   uploadMiddleware.single('avatar'),
   userController.uploadAvatar
 );
 
-// ==================== Public Profile ====================
-
-/**
- * @route   GET /api/v1/users/:id
- * @desc    Get user by ID (public profile)
- * @access  Public (with optional auth for additional data)
- */
-router.get('/:id',
-  [
-    param('id').isMongoId().withMessage('Invalid user ID'),
-    validate
-  ],
-  userController.getUserById
-);
-
 // ==================== Saved Properties ====================
 
-/**
- * @route   GET /api/v1/users/saved-properties
- * @desc    Get user's saved properties
- * @access  Private
- */
 router.get('/saved-properties',
   [
     query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
@@ -95,11 +52,6 @@ router.get('/saved-properties',
   userController.getSavedProperties
 );
 
-/**
- * @route   POST /api/v1/users/saved-properties/:propertyId
- * @desc    Save property to favorites
- * @access  Private
- */
 router.post('/saved-properties/:propertyId',
   [
     param('propertyId').isMongoId().withMessage('Invalid property ID'),
@@ -108,11 +60,6 @@ router.post('/saved-properties/:propertyId',
   userController.saveProperty
 );
 
-/**
- * @route   DELETE /api/v1/users/saved-properties/:propertyId
- * @desc    Remove property from favorites
- * @access  Private
- */
 router.delete('/saved-properties/:propertyId',
   [
     param('propertyId').isMongoId().withMessage('Invalid property ID'),
@@ -121,11 +68,6 @@ router.delete('/saved-properties/:propertyId',
   userController.removeSavedProperty
 );
 
-/**
- * @route   GET /api/v1/users/saved-properties/:propertyId/check
- * @desc    Check if property is saved
- * @access  Private
- */
 router.get('/saved-properties/:propertyId/check',
   [
     param('propertyId').isMongoId().withMessage('Invalid property ID'),
@@ -136,11 +78,6 @@ router.get('/saved-properties/:propertyId/check',
 
 // ==================== Recent Views ====================
 
-/**
- * @route   GET /api/v1/users/recent-views
- * @desc    Get user's recent property views
- * @access  Private
- */
 router.get('/recent-views',
   [
     query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
@@ -150,11 +87,6 @@ router.get('/recent-views',
   userController.getRecentViews
 );
 
-/**
- * @route   POST /api/v1/users/recent-views/:propertyId
- * @desc    Track property view
- * @access  Private
- */
 router.post('/recent-views/:propertyId',
   [
     param('propertyId').isMongoId().withMessage('Invalid property ID'),
@@ -165,18 +97,8 @@ router.post('/recent-views/:propertyId',
 
 // ==================== Preferences ====================
 
-/**
- * @route   GET /api/v1/users/preferences
- * @desc    Get user preferences
- * @access  Private
- */
 router.get('/preferences', userController.getPreferences);
 
-/**
- * @route   PUT /api/v1/users/preferences
- * @desc    Update user preferences
- * @access  Private
- */
 router.put('/preferences',
   [
     body('preferredLocations').optional().isArray(),
@@ -193,18 +115,8 @@ router.put('/preferences',
 
 // ==================== Saved Searches ====================
 
-/**
- * @route   GET /api/v1/users/saved-searches
- * @desc    Get user's saved searches
- * @access  Private
- */
 router.get('/saved-searches', userController.getSavedSearches);
 
-/**
- * @route   POST /api/v1/users/saved-searches
- * @desc    Save a search
- * @access  Private
- */
 router.post('/saved-searches',
   [
     body('name').notEmpty().withMessage('Search name is required'),
@@ -214,11 +126,6 @@ router.post('/saved-searches',
   userController.saveSearch
 );
 
-/**
- * @route   DELETE /api/v1/users/saved-searches/:searchId
- * @desc    Delete a saved search
- * @access  Private
- */
 router.delete('/saved-searches/:searchId',
   [
     param('searchId').isMongoId().withMessage('Invalid search ID'),
@@ -229,27 +136,11 @@ router.delete('/saved-searches/:searchId',
 
 // ==================== Stats & Dashboard ====================
 
-/**
- * @route   GET /api/v1/users/stats
- * @desc    Get user statistics
- * @access  Private
- */
 router.get('/stats', userController.getStats);
-
-/**
- * @route   GET /api/v1/users/dashboard
- * @desc    Get user dashboard data
- * @access  Private
- */
 router.get('/dashboard', userController.getDashboard);
 
 // ==================== Verification ====================
 
-/**
- * @route   POST /api/v1/users/verify-email
- * @desc    Verify email with token
- * @access  Private
- */
 router.post('/verify-email',
   [
     body('token').notEmpty().withMessage('Verification token is required'),
@@ -258,11 +149,6 @@ router.post('/verify-email',
   userController.verifyEmail
 );
 
-/**
- * @route   POST /api/v1/users/verify-phone
- * @desc    Verify phone with OTP
- * @access  Private
- */
 router.post('/verify-phone',
   [
     body('otp').notEmpty().withMessage('OTP is required').isLength({ min: 6, max: 6 }),
@@ -271,11 +157,6 @@ router.post('/verify-phone',
   userController.verifyPhone
 );
 
-/**
- * @route   POST /api/v1/users/verification-documents
- * @desc    Submit verification documents (for dealers/builders)
- * @access  Private
- */
 router.post('/verification-documents',
   [
     body('documents').isArray().withMessage('Documents must be an array'),
@@ -288,11 +169,6 @@ router.post('/verification-documents',
 
 // ==================== Device Tokens ====================
 
-/**
- * @route   POST /api/v1/users/device-token
- * @desc    Add device token for push notifications
- * @access  Private
- */
 router.post('/device-token',
   [
     body('token').notEmpty().withMessage('Device token is required'),
@@ -301,11 +177,6 @@ router.post('/device-token',
   userController.addDeviceToken
 );
 
-/**
- * @route   DELETE /api/v1/users/device-token
- * @desc    Remove device token
- * @access  Private
- */
 router.delete('/device-token',
   [
     body('token').notEmpty().withMessage('Device token is required'),
@@ -316,11 +187,6 @@ router.delete('/device-token',
 
 // ==================== Account Management ====================
 
-/**
- * @route   POST /api/v1/users/deactivate
- * @desc    Deactivate user account
- * @access  Private
- */
 router.post('/deactivate',
   [
     body('password').notEmpty().withMessage('Password is required'),
@@ -330,13 +196,19 @@ router.post('/deactivate',
   userController.deactivateAccount
 );
 
+// ==================== PUBLIC PROFILE (MUST BE LAST BEFORE ADMIN ROUTES) ====================
+// This route catches /users/:id - must be after all specific routes!
+
+router.get('/:id',
+  [
+    param('id').isMongoId().withMessage('Invalid user ID'),
+    validate
+  ],
+  userController.getUserById
+);
+
 // ==================== Admin Routes ====================
 
-/**
- * @route   GET /api/v1/users
- * @desc    Get all users (admin only)
- * @access  Private/Admin
- */
 router.get('/',
   authorize('admin'),
   [
@@ -365,11 +237,6 @@ router.get('/',
   }
 );
 
-/**
- * @route   PUT /api/v1/users/:userId/status
- * @desc    Update user status (admin only)
- * @access  Private/Admin
- */
 router.put('/:userId/status',
   authorize('admin'),
   [
@@ -405,11 +272,6 @@ router.put('/:userId/status',
   }
 );
 
-/**
- * @route   PUT /api/v1/users/:userId/role
- * @desc    Change user role (admin only)
- * @access  Private/Admin
- */
 router.put('/:userId/role',
   authorize('admin'),
   [
@@ -442,11 +304,6 @@ router.put('/:userId/role',
   }
 );
 
-/**
- * @route   PUT /api/v1/users/:userId/verify
- * @desc    Verify user (admin only)
- * @access  Private/Admin
- */
 router.put('/:userId/verify',
   authorize('admin'),
   [

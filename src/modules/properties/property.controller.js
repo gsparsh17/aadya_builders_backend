@@ -263,26 +263,30 @@ class PropertyController {
    * Upload property images
    * @route POST /api/v1/properties/:id/images
    */
-  async uploadImages(req, res, next) {
-    try {
-      const { id } = req.params;
-      
-      if (!req.files || req.files.length === 0) {
-        throw new AppError('Please upload at least one image', 400, 'NO_IMAGES');
-      }
-      
-      const images = req.files.map(file => ({
-        url: file.location || file.path,
-        caption: ''
-      }));
-      
-      const propertyImages = await propertyService.addPropertyImages(id, req.user.id, images);
-      
-      return successResponse(res, propertyImages, 'Images uploaded successfully');
-    } catch (error) {
-      next(error);
+async uploadImages(req, res, next) {
+  try {
+    const { id } = req.params;
+    
+    // Check for both single file and multiple files
+    const files = req.files || (req.file ? [req.file] : null);
+    
+    if (!files || files.length === 0) {
+      throw new AppError('Please upload at least one image', 400, 'NO_IMAGES');
     }
+    
+    console.log('Uploaded files:', files);
+    const images = files.map(file => ({
+      url: file.location || file.path,
+      caption: ''
+    }));
+    
+    const propertyImages = await propertyService.addPropertyImages(id, req.user.id, images);
+    
+    return successResponse(res, propertyImages, 'Images uploaded successfully');
+  } catch (error) {
+    next(error);
   }
+}
 
   /**
    * Delete property image

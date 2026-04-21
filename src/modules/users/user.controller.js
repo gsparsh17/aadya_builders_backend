@@ -132,7 +132,7 @@ class UserController {
     try {
       const page = parseInt(req.query.page) || 1;
       const limit = parseInt(req.query.limit) || 20;
-      
+      console.log('Fetching saved properties for user:', req.user, 'Page:', page, 'Limit:', limit);
       const result = await userService.getSavedProperties(req.user.id, page, limit);
       
       return paginatedResponse(res, result.properties, page, limit, result.total, 'Saved properties retrieved successfully');

@@ -72,7 +72,7 @@ const propertyValidation = {
       .notEmpty().withMessage('Pincode is required')
       .matches(/^\d{6}$/).withMessage('Invalid pincode'),
     
-    body('location.coordinates')
+    body('location.coordinates.coordinates')
       .optional()
       .isArray({ min: 2, max: 2 }).withMessage('Coordinates must be [longitude, latitude]'),
     

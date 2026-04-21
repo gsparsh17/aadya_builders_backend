@@ -13,7 +13,6 @@ const getClientIp = (req) => {
 
 /**
  * Global rate limiter for all API routes
- * Fixed for express-rate-limit v7+ IPv6 compatibility
  */
 const globalLimiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
@@ -27,15 +26,11 @@ const globalLimiter = rateLimit({
       message: 'Too many requests from this IP. Please try again later.',
     },
   },
-  // Use validate: false to bypass IPv6 validation warning
-  // Or use a custom keyGenerator with proper IPv6 handling
   keyGenerator: (req) => {
     const ip = getClientIp(req);
-    // Normalize IPv6 loopback
     if (ip === '::1' || ip === '::ffff:127.0.0.1') {
       return '127.0.0.1';
     }
-    // Remove IPv6 prefix if present
     return ip.replace(/^::ffff:/, '');
   },
   skip: (req) => process.env.NODE_ENV === 'test',
@@ -82,7 +77,6 @@ const leadLimiter = rateLimit({
     },
   },
   keyGenerator: (req) => {
-    // Use user ID if authenticated, otherwise IP
     if (req.user?.id) {
       return `user:${req.user.id}`;
     }
@@ -94,8 +88,9 @@ const leadLimiter = rateLimit({
   },
 });
 
+// ✅ Export as object with named properties
 module.exports = {
   globalLimiter,
   authLimiter,
-  leadLimiter
+  leadLimiter,
 };

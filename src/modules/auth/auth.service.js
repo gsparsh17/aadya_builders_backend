@@ -266,8 +266,8 @@ class AuthService {
     });
     
     // Send OTP via SMS (async)
-    smsService.sendOtp(phone, otp)
-      .catch(err => logger.error('Failed to send OTP SMS:', err));
+    // smsService.sendOtp(phone, otp)
+      // .catch(err => logger.error('Failed to send OTP SMS:', err));
     
     // In development, return OTP for testing
     if (process.env.NODE_ENV === 'development') {

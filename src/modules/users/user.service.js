@@ -1,17 +1,10 @@
 const User = require('./user.model');
 const { AppError } = require('../../middlewares/errorHandler');
-const { OTP, LoginHistory } = require('../auth/auth.model');
 const logger = require('../../utils/logger');
 const crypto = require('crypto');
 
-/**
- * User Service - Handles all business logic for user operations
- */
 class UserService {
   
-  /**
-   * Get user by ID with optional population
-   */
   async getUserById(userId, populateFields = []) {
     let query = User.findById(userId).select('-password -resetPasswordToken -resetPasswordExpire -emailVerificationToken -phoneOtp');
     
@@ -30,41 +23,20 @@ class UserService {
     return user;
   }
 
-  /**
-   * Get user by email
-   */
   async getUserByEmail(email, includePassword = false) {
     let query = User.findOne({ email: email.toLowerCase() });
-    
-    if (includePassword) {
-      query = query.select('+password');
-    }
-    
+    if (includePassword) query = query.select('+password');
     return await query;
   }
 
-  /**
-   * Get user by phone
-   */
   async getUserByPhone(phone, includePassword = false) {
     let query = User.findOne({ phone });
-    
-    if (includePassword) {
-      query = query.select('+password');
-    }
-    
+    if (includePassword) query = query.select('+password');
     return await query;
   }
 
-  /**
-   * Update user profile
-   */
   async updateProfile(userId, updateData) {
-    // Fields that are allowed to be updated
-    const allowedFields = [
-      'name', 'alternatePhone', 'address', 'preferences',
-      'companyDetails', 'reraDetails'
-    ];
+    const allowedFields = ['name', 'alternatePhone', 'address', 'preferences', 'companyDetails', 'reraDetails'];
     
     const filteredData = {};
     Object.keys(updateData).forEach(key => {
@@ -73,13 +45,9 @@ class UserService {
       }
     });
     
-    // Handle nested objects properly
     if (filteredData.address) {
       const user = await User.findById(userId);
-      filteredData.address = {
-        ...user.address?.toObject(),
-        ...filteredData.address
-      };
+      filteredData.address = { ...user.address?.toObject(), ...filteredData.address };
     }
     
     if (filteredData.preferences) {
@@ -103,9 +71,6 @@ class UserService {
     return user;
   }
 
-  /**
-   * Change user password
-   */
   async changePassword(userId, currentPassword, newPassword) {
     const user = await User.findById(userId).select('+password');
     
@@ -113,24 +78,17 @@ class UserService {
       throw new AppError('User not found', 404, 'USER_NOT_FOUND');
     }
     
-    // Verify current password
     const isPasswordCorrect = await user.comparePassword(currentPassword);
     if (!isPasswordCorrect) {
       throw new AppError('Current password is incorrect', 401, 'INVALID_PASSWORD');
     }
     
-    // Update password
     user.password = newPassword;
     await user.save();
-    
-    // Blacklist all existing tokens (handled in auth service)
     
     return true;
   }
 
-  /**
-   * Update profile picture
-   */
   async updateProfilePicture(userId, imageUrl) {
     const user = await User.findByIdAndUpdate(
       userId,
@@ -141,9 +99,6 @@ class UserService {
     return user;
   }
 
-  /**
-   * Save property to favorites
-   */
   async saveProperty(userId, propertyId) {
     const user = await User.findById(userId);
     
@@ -151,24 +106,23 @@ class UserService {
       throw new AppError('User not found', 404, 'USER_NOT_FOUND');
     }
     
-    // Check if already saved
     const alreadySaved = user.savedProperties.includes(propertyId);
     
     if (!alreadySaved) {
       user.savedProperties.push(propertyId);
       await user.save();
       
-      // Increment property favorites count
-      const Property = require('../properties/property.model');
-      await Property.findByIdAndUpdate(propertyId, { $inc: { favorites: 1 } });
+      try {
+        const Property = require('../properties/property.model');
+        await Property.findByIdAndUpdate(propertyId, { $inc: { favorites: 1 } });
+      } catch (e) {
+        logger.warn('Failed to update property favorites count');
+      }
     }
     
     return user.savedProperties;
   }
 
-  /**
-   * Remove property from favorites
-   */
   async removeSavedProperty(userId, propertyId) {
     const user = await User.findById(userId);
     
@@ -181,16 +135,16 @@ class UserService {
     );
     await user.save();
     
-    // Decrement property favorites count
-    const Property = require('../properties/property.model');
-    await Property.findByIdAndUpdate(propertyId, { $inc: { favorites: -1 } });
+    try {
+      const Property = require('../properties/property.model');
+      await Property.findByIdAndUpdate(propertyId, { $inc: { favorites: -1 } });
+    } catch (e) {
+      logger.warn('Failed to update property favorites count');
+    }
     
     return user.savedProperties;
   }
 
-  /**
-   * Get user's saved properties
-   */
   async getSavedProperties(userId, page = 1, limit = 20) {
     const user = await User.findById(userId).populate({
       path: 'savedProperties',
@@ -206,20 +160,20 @@ class UserService {
       throw new AppError('User not found', 404, 'USER_NOT_FOUND');
     }
     
-    const total = user.savedProperties.length;
+    const total = await User.aggregate([
+      { $match: { _id: user._id } },
+      { $project: { count: { $size: '$savedProperties' } } }
+    ]);
     
     return {
-      properties: user.savedProperties,
-      total,
+      properties: user.savedProperties || [],
+      total: total[0]?.count || 0,
       page,
       limit,
-      totalPages: Math.ceil(total / limit)
+      totalPages: Math.ceil((total[0]?.count || 0) / limit)
     };
   }
 
-  /**
-   * Track property view
-   */
   async trackPropertyView(userId, propertyId) {
     const user = await User.findById(userId);
     
@@ -227,36 +181,26 @@ class UserService {
       throw new AppError('User not found', 404, 'USER_NOT_FOUND');
     }
     
-    // Remove if already exists
     user.recentViews = user.recentViews.filter(
       view => view.property.toString() !== propertyId.toString()
     );
     
-    // Add to beginning
     user.recentViews.unshift({
       property: propertyId,
       viewedAt: new Date()
     });
     
-    // Keep only last 50 views
     user.recentViews = user.recentViews.slice(0, 50);
-    
     await user.save();
     
     return user.recentViews;
   }
 
-  /**
-   * Get user's recent views
-   */
   async getRecentViews(userId, page = 1, limit = 20) {
     const user = await User.findById(userId).populate({
       path: 'recentViews.property',
       match: { status: 'active' },
-      options: {
-        limit: limit,
-        skip: (page - 1) * limit
-      }
+      options: { limit: limit, skip: (page - 1) * limit }
     });
     
     if (!user) {
@@ -271,9 +215,6 @@ class UserService {
     };
   }
 
-  /**
-   * Update user preferences
-   */
   async updatePreferences(userId, preferences) {
     const user = await User.findById(userId);
     
@@ -291,13 +232,9 @@ class UserService {
     };
     
     await user.save();
-    
     return user.preferences;
   }
 
-  /**
-   * Save search filters
-   */
   async saveSearch(userId, searchName, filters) {
     const user = await User.findById(userId);
     
@@ -305,7 +242,6 @@ class UserService {
       throw new AppError('User not found', 404, 'USER_NOT_FOUND');
     }
     
-    // Limit saved searches to 20
     if (user.savedSearches.length >= 20) {
       user.savedSearches.pop();
     }
@@ -317,13 +253,9 @@ class UserService {
     });
     
     await user.save();
-    
     return user.savedSearches;
   }
 
-  /**
-   * Get user's saved searches
-   */
   async getSavedSearches(userId) {
     const user = await User.findById(userId);
     
@@ -331,12 +263,9 @@ class UserService {
       throw new AppError('User not found', 404, 'USER_NOT_FOUND');
     }
     
-    return user.savedSearches;
+    return user.savedSearches || [];
   }
 
-  /**
-   * Delete saved search
-   */
   async deleteSavedSearch(userId, searchId) {
     const user = await User.findById(userId);
     
@@ -349,13 +278,9 @@ class UserService {
     );
     
     await user.save();
-    
     return user.savedSearches;
   }
 
-  /**
-   * Add device token for push notifications
-   */
   async addDeviceToken(userId, token) {
     const user = await User.findById(userId);
     
@@ -371,9 +296,6 @@ class UserService {
     return user.deviceTokens;
   }
 
-  /**
-   * Remove device token
-   */
   async removeDeviceToken(userId, token) {
     const user = await User.findById(userId);
     
@@ -387,9 +309,6 @@ class UserService {
     return user.deviceTokens;
   }
 
-  /**
-   * Get user statistics
-   */
   async getUserStats(userId) {
     const user = await User.findById(userId);
     
@@ -397,7 +316,7 @@ class UserService {
       throw new AppError('User not found', 404, 'USER_NOT_FOUND');
     }
     
-    const Property = require('../properties/property.model');
+  const Property = require('../properties/property.model');
     const Lead = require('../leads/lead.model');
     
     const [propertyStats, leadStats] = await Promise.all([
@@ -437,9 +356,6 @@ class UserService {
     };
   }
 
-  /**
-   * Verify user email
-   */
   async verifyEmail(userId, token) {
     const user = await User.findById(userId).select('+emailVerificationToken +emailVerificationExpire');
     
@@ -465,19 +381,14 @@ class UserService {
     user.emailVerificationToken = undefined;
     user.emailVerificationExpire = undefined;
     
-    // If both email and phone verified, mark user as verified
     if (user.phoneVerified) {
       user.isVerified = true;
     }
     
     await user.save();
-    
     return true;
   }
 
-  /**
-   * Verify user phone with OTP
-   */
   async verifyPhone(userId, otp) {
     const user = await User.findById(userId).select('+phoneOtp +phoneOtpExpire');
     
@@ -503,19 +414,14 @@ class UserService {
     user.phoneOtp = undefined;
     user.phoneOtpExpire = undefined;
     
-    // If both email and phone verified, mark user as verified
     if (user.emailVerified) {
       user.isVerified = true;
     }
     
     await user.save();
-    
     return true;
   }
 
-  /**
-   * Submit verification documents (for dealers/builders)
-   */
   async submitVerificationDocuments(userId, documents) {
     const user = await User.findById(userId);
     
@@ -533,13 +439,9 @@ class UserService {
     });
     
     await user.save();
-    
     return user.verificationDocuments;
   }
 
-  /**
-   * Deactivate account
-   */
   async deactivateAccount(userId, reason) {
     const user = await User.findById(userId);
     
@@ -552,46 +454,15 @@ class UserService {
     user.deactivatedAt = new Date();
     
     await user.save();
-    
     return true;
   }
 
-  /**
-   * Reactivate account
-   */
-  async reactivateAccount(userId) {
-    const user = await User.findById(userId);
-    
-    if (!user) {
-      throw new AppError('User not found', 404, 'USER_NOT_FOUND');
-    }
-    
-    user.isActive = true;
-    user.deactivationReason = undefined;
-    user.deactivatedAt = undefined;
-    
-    await user.save();
-    
-    return true;
-  }
-
-  /**
-   * Search users (admin only)
-   */
   async searchUsers(filters = {}, page = 1, limit = 20) {
     const query = {};
     
-    if (filters.role) {
-      query.role = filters.role;
-    }
-    
-    if (filters.isVerified !== undefined) {
-      query.isVerified = filters.isVerified;
-    }
-    
-    if (filters.isActive !== undefined) {
-      query.isActive = filters.isActive;
-    }
+    if (filters.role) query.role = filters.role;
+    if (filters.isVerified !== undefined) query.isVerified = filters.isVerified;
+    if (filters.isActive !== undefined) query.isActive = filters.isActive;
     
     if (filters.search) {
       query.$or = [
@@ -605,27 +476,14 @@ class UserService {
       query['address.city'] = { $regex: filters.city, $options: 'i' };
     }
     
-    if (filters.subscriptionActive !== undefined) {
-      query['subscription.isActive'] = filters.subscriptionActive;
-    }
-    
     const [users, total] = await Promise.all([
-      User.find(query)
-        .select('-password')
-        .sort({ createdAt: -1 })
-        .skip((page - 1) * limit)
-        .limit(limit),
+      User.find(query).select('-password').sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit),
       User.countDocuments(query)
     ]);
     
-    return {
-      users,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit)
-    };
+    return { users, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 }
 
+// ✅ CRITICAL: Export as singleton instance
 module.exports = new UserService();

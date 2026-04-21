@@ -12,7 +12,7 @@ const axios = require('axios');
  * Property Service - Handles all business logic for property operations
  */
 class PropertyService {
-  
+
   /**
    * Generate unique property code
    */
@@ -27,6 +27,9 @@ class PropertyService {
   /**
    * Geocode address to coordinates
    */
+  /**
+   * Geocode address to coordinates
+   */
   async geocodeAddress(address, city, state) {
     try {
       const fullAddress = `${address}, ${city}, ${state}, India`;
@@ -36,17 +39,29 @@ class PropertyService {
           key: process.env.GOOGLE_MAPS_API_KEY
         }
       });
-      
+
       if (response.data.results && response.data.results.length > 0) {
         const location = response.data.results[0].geometry.location;
-        return [location.lng, location.lat];
+        // Return as GeoJSON Point format
+        return {
+          type: 'Point',
+          coordinates: [location.lng, location.lat]
+        };
       }
-      
+
       // Return default coordinates for the city if geocoding fails
-      return this.getDefaultCityCoordinates(city);
+      const defaultCoords = this.getDefaultCityCoordinates(city);
+      return {
+        type: 'Point',
+        coordinates: defaultCoords
+      };
     } catch (error) {
       logger.error('Geocoding error:', error);
-      return this.getDefaultCityCoordinates(city);
+      const defaultCoords = this.getDefaultCityCoordinates(city);
+      return {
+        type: 'Point',
+        coordinates: defaultCoords
+      };
     }
   }
 
@@ -66,7 +81,7 @@ class PropertyService {
       'jaipur': [75.7873, 26.9124],
       'lucknow': [80.9462, 26.8467]
     };
-    
+
     const normalizedCity = city.toLowerCase();
     return cityCoordinates[normalizedCity] || [78.9629, 20.5937]; // Default to center of India
   }
@@ -76,16 +91,16 @@ class PropertyService {
    */
   async createProperty(userId, propertyData) {
     const user = await User.findById(userId);
-    
+
     if (!user) {
       throw new AppError('User not found', 404, 'USER_NOT_FOUND');
     }
-    
+
     // Check if user can post property
     if (!user.canPostProperty()) {
       throw new AppError('You have reached your listing limit. Please upgrade your plan.', 403, 'LISTING_LIMIT_REACHED');
     }
-    
+
     // Geocode address if coordinates not provided
     if (!propertyData.location?.coordinates) {
       const coordinates = await this.geocodeAddress(
@@ -95,13 +110,13 @@ class PropertyService {
       );
       propertyData.location.coordinates = { type: 'Point', coordinates };
     }
-    
+
     // Generate property code
     const propertyCode = this.generatePropertyCode(
       propertyData.purpose,
       propertyData.propertyType
     );
-    
+
     // Create property
     const property = await Property.create({
       ...propertyData,
@@ -110,21 +125,21 @@ class PropertyService {
       ownerType: user.role === 'dealer' ? 'dealer' : user.role === 'builder' ? 'builder' : 'individual',
       status: 'pending'
     });
-    
+
     // Update user's listing count
     if (user.subscription) {
       user.subscription.listingsPosted = (user.subscription.listingsPosted || 0) + 1;
       user.subscription.listingsRemaining = Math.max(0, (user.subscription.listingsRemaining || 0) - 1);
       await user.save();
     }
-    
+
     // Clear search cache
     await clearCache('search:*');
-    
+
     // Send notification email
     emailService.sendPropertyCreatedEmail(user.email, user.name, property.title, property.propertyCode)
       .catch(err => logger.error('Failed to send property created email:', err));
-    
+
     return property;
   }
 
@@ -135,16 +150,16 @@ class PropertyService {
     const property = await Property.findById(propertyId)
       .populate('owner', 'name email phone profilePicture role isVerified companyDetails')
       .populate('project', 'name builder totalUnits possessionDate');
-    
+
     if (!property) {
       throw new AppError('Property not found', 404, 'PROPERTY_NOT_FOUND');
     }
-    
+
     // Increment view count (async, don't wait)
-    this.incrementPropertyViews(propertyId, userId).catch(err => 
+    this.incrementPropertyViews(propertyId, userId).catch(err =>
       logger.error('Failed to increment views:', err)
     );
-    
+
     // Add isSaved flag if user is authenticated
     if (userId) {
       const user = await User.findById(userId);
@@ -153,7 +168,7 @@ class PropertyService {
         property._doc.isSaved = isSaved;
       }
     }
-    
+
     return property;
   }
 
@@ -163,16 +178,16 @@ class PropertyService {
   async getPropertyByCode(propertyCode, userId = null) {
     const property = await Property.findOne({ propertyCode })
       .populate('owner', 'name email phone profilePicture role isVerified companyDetails');
-    
+
     if (!property) {
       throw new AppError('Property not found', 404, 'PROPERTY_NOT_FOUND');
     }
-    
+
     // Increment view count
-    this.incrementPropertyViews(property._id, userId).catch(err => 
+    this.incrementPropertyViews(property._id, userId).catch(err =>
       logger.error('Failed to increment views:', err)
     );
-    
+
     return property;
   }
 
@@ -181,13 +196,13 @@ class PropertyService {
    */
   async incrementPropertyViews(propertyId, userId = null) {
     const update = { $inc: { views: 1 } };
-    
+
     // Track unique views (simplified - in production use Redis for better accuracy)
     if (userId) {
       // Check if user has viewed this property recently
       const PropertyView = require('./property.model'); // Would need a separate view tracking model
     }
-    
+
     await Property.findByIdAndUpdate(propertyId, update);
   }
 
@@ -196,20 +211,20 @@ class PropertyService {
    */
   async updateProperty(propertyId, userId, updateData, userRole) {
     const property = await Property.findById(propertyId);
-    
+
     if (!property) {
       throw new AppError('Property not found', 404, 'PROPERTY_NOT_FOUND');
     }
-    
+
     // Check ownership (unless admin)
     if (userRole !== 'admin' && property.owner.toString() !== userId) {
       throw new AppError('You do not have permission to update this property', 403, 'FORBIDDEN');
     }
-    
+
     // Fields that cannot be updated
     const restrictedFields = ['propertyCode', 'owner', 'ownerType', 'isVerified', 'views', 'leads', 'rankingScore'];
     restrictedFields.forEach(field => delete updateData[field]);
-    
+
     // If address changed, re-geocode
     if (updateData.location && (updateData.location.address || updateData.location.city)) {
       const coordinates = await this.geocodeAddress(
@@ -219,17 +234,17 @@ class PropertyService {
       );
       updateData.location.coordinates = { type: 'Point', coordinates };
     }
-    
+
     const updatedProperty = await Property.findByIdAndUpdate(
       propertyId,
       { $set: updateData },
       { new: true, runValidators: true }
     );
-    
+
     // Clear cache
     await clearCache(`property:${propertyId}*`);
     await clearCache('search:*');
-    
+
     return updatedProperty;
   }
 
@@ -238,30 +253,30 @@ class PropertyService {
    */
   async deleteProperty(propertyId, userId, userRole) {
     const property = await Property.findById(propertyId);
-    
+
     if (!property) {
       throw new AppError('Property not found', 404, 'PROPERTY_NOT_FOUND');
     }
-    
+
     // Check ownership (unless admin)
     if (userRole !== 'admin' && property.owner.toString() !== userId) {
       throw new AppError('You do not have permission to delete this property', 403, 'FORBIDDEN');
     }
-    
+
     // Delete associated images from S3 (async)
     if (property.images && property.images.length > 0) {
       // Implement S3 deletion
     }
-    
+
     await Property.findByIdAndDelete(propertyId);
-    
+
     // Delete associated leads
     await Lead.deleteMany({ property: propertyId });
-    
+
     // Clear cache
     await clearCache(`property:${propertyId}*`);
     await clearCache('search:*');
-    
+
     return true;
   }
 
@@ -270,27 +285,27 @@ class PropertyService {
    */
   async updatePropertyStatus(propertyId, userId, status, userRole) {
     const property = await Property.findById(propertyId);
-    
+
     if (!property) {
       throw new AppError('Property not found', 404, 'PROPERTY_NOT_FOUND');
     }
-    
+
     if (userRole !== 'admin' && property.owner.toString() !== userId) {
       throw new AppError('You do not have permission to update this property', 403, 'FORBIDDEN');
     }
-    
+
     property.status = status;
-    
+
     if (status === 'sold' || status === 'rented') {
       property.soldAt = new Date();
     }
-    
+
     await property.save();
-    
+
     // Clear cache
     await clearCache(`property:${propertyId}*`);
     await clearCache('search:*');
-    
+
     return property;
   }
 
@@ -299,49 +314,49 @@ class PropertyService {
    */
   async searchProperties(filters, page = 1, limit = 20) {
     const query = { status: 'active' };
-    
+
     // Purpose filter
     if (filters.purpose) {
       query.purpose = filters.purpose;
     }
-    
+
     // Property type filter
     if (filters.propertyType) {
       const types = filters.propertyType.split(',').map(t => t.trim());
       query.propertyType = { $in: types };
     }
-    
+
     // City filter
     if (filters.city) {
       query['location.city'] = { $regex: filters.city, $options: 'i' };
     }
-    
+
     // Locality filter
     if (filters.locality) {
       query['location.locality'] = { $regex: filters.locality, $options: 'i' };
     }
-    
+
     // Price range filter
     if (filters.minPrice || filters.maxPrice) {
       query.price = {};
       if (filters.minPrice) query.price.$gte = parseFloat(filters.minPrice);
       if (filters.maxPrice) query.price.$lte = parseFloat(filters.maxPrice);
     }
-    
+
     // Area range filter
     if (filters.minArea || filters.maxArea) {
       query['area.value'] = {};
       if (filters.minArea) query['area.value'].$gte = parseFloat(filters.minArea);
       if (filters.maxArea) query['area.value'].$lte = parseFloat(filters.maxArea);
     }
-    
+
     // BHK filter
     if (filters.bhk) {
       const bhkValues = filters.bhk.split(',').map(b => {
         if (b === '4+') return { $gte: 4 };
         return parseInt(b);
       });
-      
+
       if (bhkValues.some(v => typeof v === 'object')) {
         query.$or = bhkValues.map(v => {
           if (typeof v === 'object') return { bedrooms: v };
@@ -351,33 +366,33 @@ class PropertyService {
         query.bedrooms = { $in: bhkValues };
       }
     }
-    
+
     // Furnishing filter
     if (filters.furnishing) {
       query.furnishing = filters.furnishing;
     }
-    
+
     // Amenities filter
     if (filters.amenities) {
       const amenities = filters.amenities.split(',').map(a => a.trim());
       query.amenities = { $all: amenities };
     }
-    
+
     // Posted by filter
     if (filters.postedBy) {
       query.ownerType = filters.postedBy;
     }
-    
+
     // Verification filter
     if (filters.verified === 'true') {
       query.isVerified = true;
     }
-    
+
     // Featured filter
     if (filters.featured === 'true') {
       query.isFeatured = true;
     }
-    
+
     // Geospatial search
     if (filters.latitude && filters.longitude && filters.radius) {
       query['location.coordinates'] = {
@@ -390,7 +405,7 @@ class PropertyService {
         }
       };
     }
-    
+
     // Determine sort order
     let sortOptions = {};
     switch (filters.sort) {
@@ -411,10 +426,10 @@ class PropertyService {
         sortOptions = { rankingScore: -1, createdAt: -1 };
         break;
     }
-    
+
     // Execute query
     const skip = (page - 1) * limit;
-    
+
     const [properties, total] = await Promise.all([
       Property.find(query)
         .populate('owner', 'name profilePicture role isVerified')
@@ -424,7 +439,7 @@ class PropertyService {
         .select('-__v'),
       Property.countDocuments(query)
     ]);
-    
+
     return {
       properties,
       total,
@@ -439,17 +454,17 @@ class PropertyService {
    */
   async getUserProperties(userId, filters = {}, page = 1, limit = 20) {
     const query = { owner: userId };
-    
+
     if (filters.status) {
       query.status = filters.status;
     }
-    
+
     if (filters.purpose) {
       query.purpose = filters.purpose;
     }
-    
+
     const skip = (page - 1) * limit;
-    
+
     const [properties, total] = await Promise.all([
       Property.find(query)
         .sort({ createdAt: -1 })
@@ -457,7 +472,7 @@ class PropertyService {
         .limit(limit),
       Property.countDocuments(query)
     ]);
-    
+
     return {
       properties,
       total,
@@ -472,11 +487,11 @@ class PropertyService {
    */
   async getSimilarProperties(propertyId, limit = 10) {
     const property = await Property.findById(propertyId);
-    
+
     if (!property) {
       throw new AppError('Property not found', 404, 'PROPERTY_NOT_FOUND');
     }
-    
+
     const query = {
       _id: { $ne: propertyId },
       status: 'active',
@@ -484,19 +499,19 @@ class PropertyService {
       'location.city': property.location.city,
       propertyType: property.propertyType
     };
-    
+
     // Price range: ±30%
     const priceRange = property.price * 0.3;
     query.price = {
       $gte: property.price - priceRange,
       $lte: property.price + priceRange
     };
-    
+
     const similarProperties = await Property.find(query)
       .populate('owner', 'name profilePicture')
       .sort({ rankingScore: -1 })
       .limit(limit);
-    
+
     return similarProperties;
   }
 
@@ -518,7 +533,7 @@ class PropertyService {
     })
       .populate('owner', 'name profilePicture')
       .limit(limit);
-    
+
     return properties;
   }
 
@@ -531,16 +546,16 @@ class PropertyService {
       isFeatured: true,
       featuredUntil: { $gt: new Date() }
     };
-    
+
     if (city) {
       query['location.city'] = { $regex: city, $options: 'i' };
     }
-    
+
     const properties = await Property.find(query)
       .populate('owner', 'name profilePicture')
       .sort({ rankingScore: -1 })
       .limit(limit);
-    
+
     return properties;
   }
 
@@ -552,32 +567,34 @@ class PropertyService {
       status: 'active',
       'location.city': { $regex: city, $options: 'i' }
     };
-    
+
     if (locality) {
       matchStage['location.locality'] = { $regex: locality, $options: 'i' };
     }
-    
+
     if (propertyType) {
       matchStage.propertyType = propertyType;
     }
-    
+
     const trends = await Property.aggregate([
       { $match: matchStage },
-      { $group: {
-        _id: {
-          purpose: '$purpose',
-          propertyType: '$propertyType',
-          locality: '$location.locality'
-        },
-        avgPrice: { $avg: '$price' },
-        avgPricePerSqft: { $avg: '$pricePerSqft' },
-        minPrice: { $min: '$price' },
-        maxPrice: { $max: '$price' },
-        count: { $sum: 1 }
-      }},
+      {
+        $group: {
+          _id: {
+            purpose: '$purpose',
+            propertyType: '$propertyType',
+            locality: '$location.locality'
+          },
+          avgPrice: { $avg: '$price' },
+          avgPricePerSqft: { $avg: '$pricePerSqft' },
+          minPrice: { $min: '$price' },
+          maxPrice: { $max: '$price' },
+          count: { $sum: 1 }
+        }
+      },
       { $sort: { count: -1 } }
     ]);
-    
+
     return trends;
   }
 
@@ -587,34 +604,40 @@ class PropertyService {
   async getPropertyStats() {
     const stats = await Property.aggregate([
       { $match: { status: 'active' } },
-      { $group: {
-        _id: null,
-        totalProperties: { $sum: 1 },
-        avgPrice: { $avg: '$price' },
-        totalViews: { $sum: '$views' },
-        totalLeads: { $sum: '$leads' }
-      }}
+      {
+        $group: {
+          _id: null,
+          totalProperties: { $sum: 1 },
+          avgPrice: { $avg: '$price' },
+          totalViews: { $sum: '$views' },
+          totalLeads: { $sum: '$leads' }
+        }
+      }
     ]);
-    
+
     const byCity = await Property.aggregate([
       { $match: { status: 'active' } },
-      { $group: {
-        _id: '$location.city',
-        count: { $sum: 1 },
-        avgPrice: { $avg: '$price' }
-      }},
+      {
+        $group: {
+          _id: '$location.city',
+          count: { $sum: 1 },
+          avgPrice: { $avg: '$price' }
+        }
+      },
       { $sort: { count: -1 } },
       { $limit: 10 }
     ]);
-    
+
     const byPurpose = await Property.aggregate([
       { $match: { status: 'active' } },
-      { $group: {
-        _id: '$purpose',
-        count: { $sum: 1 }
-      }}
+      {
+        $group: {
+          _id: '$purpose',
+          count: { $sum: 1 }
+        }
+      }
     ]);
-    
+
     return {
       overview: stats[0] || { totalProperties: 0, avgPrice: 0, totalViews: 0, totalLeads: 0 },
       byCity,
@@ -627,20 +650,20 @@ class PropertyService {
    */
   async addPropertyImages(propertyId, userId, images) {
     const property = await Property.findById(propertyId);
-    
+
     if (!property) {
       throw new AppError('Property not found', 404, 'PROPERTY_NOT_FOUND');
     }
-    
+
     if (property.owner.toString() !== userId) {
       throw new AppError('You do not have permission to modify this property', 403, 'FORBIDDEN');
     }
-    
+
     // Check image limit
     if (property.images.length + images.length > 20) {
       throw new AppError('Maximum 20 images allowed per property', 400, 'IMAGE_LIMIT_EXCEEDED');
     }
-    
+
     const newImages = images.map((img, index) => ({
       url: img.url || img.location || img.path,
       caption: img.caption || '',
@@ -648,10 +671,10 @@ class PropertyService {
       order: property.images.length + index,
       uploadedAt: new Date()
     }));
-    
+
     property.images.push(...newImages);
     await property.save();
-    
+
     return property.images;
   }
 
@@ -660,38 +683,38 @@ class PropertyService {
    */
   async deletePropertyImage(propertyId, imageId, userId) {
     const property = await Property.findById(propertyId);
-    
+
     if (!property) {
       throw new AppError('Property not found', 404, 'PROPERTY_NOT_FOUND');
     }
-    
+
     if (property.owner.toString() !== userId) {
       throw new AppError('You do not have permission to modify this property', 403, 'FORBIDDEN');
     }
-    
+
     const imageIndex = property.images.findIndex(img => img._id.toString() === imageId);
-    
+
     if (imageIndex === -1) {
       throw new AppError('Image not found', 404, 'IMAGE_NOT_FOUND');
     }
-    
+
     const wasPrimary = property.images[imageIndex].isPrimary;
-    
+
     // Remove image
     property.images.splice(imageIndex, 1);
-    
+
     // If primary was removed, set new primary
     if (wasPrimary && property.images.length > 0) {
       property.images[0].isPrimary = true;
     }
-    
+
     // Reorder remaining images
     property.images.forEach((img, index) => {
       img.order = index;
     });
-    
+
     await property.save();
-    
+
     return property.images;
   }
 
@@ -700,29 +723,29 @@ class PropertyService {
    */
   async setPrimaryImage(propertyId, imageId, userId) {
     const property = await Property.findById(propertyId);
-    
+
     if (!property) {
       throw new AppError('Property not found', 404, 'PROPERTY_NOT_FOUND');
     }
-    
+
     if (property.owner.toString() !== userId) {
       throw new AppError('You do not have permission to modify this property', 403, 'FORBIDDEN');
     }
-    
+
     // Reset all primary flags
     property.images.forEach(img => {
       img.isPrimary = false;
     });
-    
+
     // Set new primary
     const targetImage = property.images.find(img => img._id.toString() === imageId);
     if (!targetImage) {
       throw new AppError('Image not found', 404, 'IMAGE_NOT_FOUND');
     }
-    
+
     targetImage.isPrimary = true;
     await property.save();
-    
+
     return property.images;
   }
 
@@ -731,15 +754,15 @@ class PropertyService {
    */
   async reorderImages(propertyId, imageOrders, userId) {
     const property = await Property.findById(propertyId);
-    
+
     if (!property) {
       throw new AppError('Property not found', 404, 'PROPERTY_NOT_FOUND');
     }
-    
+
     if (property.owner.toString() !== userId) {
       throw new AppError('You do not have permission to modify this property', 403, 'FORBIDDEN');
     }
-    
+
     // Update order for each image
     imageOrders.forEach(({ imageId, order }) => {
       const image = property.images.find(img => img._id.toString() === imageId);
@@ -747,12 +770,12 @@ class PropertyService {
         image.order = order;
       }
     });
-    
+
     // Sort images by order
     property.images.sort((a, b) => a.order - b.order);
-    
+
     await property.save();
-    
+
     return property.images;
   }
 
@@ -761,38 +784,38 @@ class PropertyService {
    */
   async verifyProperty(propertyId, adminId, isVerified, rejectionReason = null) {
     const property = await Property.findById(propertyId);
-    
+
     if (!property) {
       throw new AppError('Property not found', 404, 'PROPERTY_NOT_FOUND');
     }
-    
+
     property.isVerified = isVerified;
     property.verifiedBy = adminId;
     property.verificationDate = new Date();
-    
+
     if (!isVerified) {
       property.status = 'rejected';
       property.rejectionReason = rejectionReason || 'Does not meet verification criteria';
     } else {
       property.status = 'active';
     }
-    
+
     await property.save();
-    
+
     // Notify owner
     const User = require('../users/user.model');
     const owner = await User.findById(property.owner);
     if (owner) {
       const subject = isVerified ? 'Your property has been verified' : 'Property verification failed';
-      const message = isVerified 
+      const message = isVerified
         ? `Congratulations! Your property "${property.title}" has been verified and is now live.`
         : `Your property "${property.title}" could not be verified. Reason: ${property.rejectionReason}`;
-      
-      emailService.sendEmail(owner.email, subject, message).catch(err => 
+
+      emailService.sendEmail(owner.email, subject, message).catch(err =>
         logger.error('Failed to send verification email:', err)
       );
     }
-    
+
     return property;
   }
 
@@ -801,16 +824,16 @@ class PropertyService {
    */
   async toggleFeatureProperty(propertyId, isFeatured, featuredUntil = null) {
     const property = await Property.findById(propertyId);
-    
+
     if (!property) {
       throw new AppError('Property not found', 404, 'PROPERTY_NOT_FOUND');
     }
-    
+
     property.isFeatured = isFeatured;
     property.featuredUntil = isFeatured ? (featuredUntil || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)) : null;
-    
+
     await property.save();
-    
+
     return property;
   }
 
@@ -820,14 +843,16 @@ class PropertyService {
   async getCitiesList() {
     const cities = await Property.aggregate([
       { $match: { status: 'active' } },
-      { $group: {
-        _id: '$location.city',
-        count: { $sum: 1 }
-      }},
+      {
+        $group: {
+          _id: '$location.city',
+          count: { $sum: 1 }
+        }
+      },
       { $sort: { count: -1 } },
       { $limit: 50 }
     ]);
-    
+
     return cities.map(c => ({ name: c._id, count: c.count }));
   }
 
@@ -836,20 +861,22 @@ class PropertyService {
    */
   async getLocalitiesByCity(city) {
     const localities = await Property.aggregate([
-      { 
-        $match: { 
+      {
+        $match: {
           status: 'active',
           'location.city': { $regex: city, $options: 'i' }
-        } 
+        }
       },
-      { $group: {
-        _id: '$location.locality',
-        count: { $sum: 1 }
-      }},
+      {
+        $group: {
+          _id: '$location.locality',
+          count: { $sum: 1 }
+        }
+      },
       { $sort: { count: -1 } },
       { $limit: 100 }
     ]);
-    
+
     return localities.map(l => ({ name: l._id, count: l.count }));
   }
 }

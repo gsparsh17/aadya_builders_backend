@@ -6,6 +6,7 @@ const { errorResponse } = require('../utils/responseHandler');
  */
 const validate = (req, res, next) => {
   const errors = validationResult(req);
+  console.log('Validation errors:', errors.array());
 
   if (!errors.isEmpty()) {
     return errorResponse(

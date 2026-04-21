@@ -3,7 +3,6 @@ const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
 const morgan = require('morgan');
-const mongoSanitize = require('express-mongo-sanitize');
 const path = require('path');
 
 // Load environment variables
@@ -71,8 +70,57 @@ app.use(compression());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// ================= SANITIZATION =================
-app.use(mongoSanitize());
+// ================= CUSTOM MONGO SANITIZER =================
+// Custom middleware to sanitize NoSQL injection attempts
+// Replaces express-mongo-sanitize which has compatibility issues
+const customMongoSanitize = (req, res, next) => {
+  const sanitize = (obj) => {
+    if (!obj || typeof obj !== 'object') return;
+    
+    Object.keys(obj).forEach(key => {
+      // Remove MongoDB operators ($ prefix)
+      if (key.startsWith('$') || key.includes('.')) {
+        delete obj[key];
+      } else if (typeof obj[key] === 'object' && obj[key] !== null) {
+        // Recursively sanitize nested objects
+        sanitize(obj[key]);
+      }
+    });
+  };
+  
+  // Sanitize request body
+  if (req.body) {
+    sanitize(req.body);
+  }
+  
+  // Sanitize request params
+  if (req.params) {
+    sanitize(req.params);
+  }
+  
+  // Sanitize request query (handle carefully to avoid getter issues)
+  if (req.query) {
+    try {
+      // Create a shallow copy to avoid modifying the original getter
+      const sanitizedQuery = { ...req.query };
+      sanitize(sanitizedQuery);
+      // Replace query with sanitized version
+      req.query = sanitizedQuery;
+    } catch (err) {
+      // If copying fails, sanitize in place carefully
+      Object.keys(req.query).forEach(key => {
+        if (key.startsWith('$') || key.includes('.')) {
+          delete req.query[key];
+        }
+      });
+    }
+  }
+  
+  next();
+};
+
+// Apply custom sanitizer
+app.use(customMongoSanitize);
 
 // ================= LOGGING =================
 if (process.env.NODE_ENV !== 'test') {
@@ -134,7 +182,7 @@ routeModules.forEach(({ path, module, name }) => {
   try {
     const routeModule = require(module);
 
-    // 🔍 DEBUG CHECK
+    // 🔍 DEBUG CHECK - Express router is a function
     if (typeof routeModule !== 'function') {
       throw new Error(`Invalid route export. Expected function but got ${typeof routeModule}`);
     }
