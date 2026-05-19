@@ -103,12 +103,12 @@ class PropertyService {
 
     // Geocode address if coordinates not provided
     if (!propertyData.location?.coordinates) {
-      const coordinates = await this.geocodeAddress(
+      const geoCoordinates = await this.geocodeAddress(
         propertyData.location.address,
         propertyData.location.city,
         propertyData.location.state
       );
-      propertyData.location.coordinates = { type: 'Point', coordinates };
+      propertyData.location.coordinates = geoCoordinates;
     }
 
     // Generate property code
@@ -148,8 +148,8 @@ class PropertyService {
    */
   async getPropertyById(propertyId, userId = null) {
     const property = await Property.findById(propertyId)
-      .populate('owner', 'name email phone profilePicture role isVerified companyDetails')
-      .populate('project', 'name builder totalUnits possessionDate');
+      .populate('owner', 'name email phone profilePicture role isVerified companyDetails');
+      // .populate('project', 'name builder totalUnits possessionDate');
 
     if (!property) {
       throw new AppError('Property not found', 404, 'PROPERTY_NOT_FOUND');
@@ -227,12 +227,12 @@ class PropertyService {
 
     // If address changed, re-geocode
     if (updateData.location && (updateData.location.address || updateData.location.city)) {
-      const coordinates = await this.geocodeAddress(
+      const geoCoordinates = await this.geocodeAddress(
         updateData.location.address || property.location.address,
         updateData.location.city || property.location.city,
         updateData.location.state || property.location.state
       );
-      updateData.location.coordinates = { type: 'Point', coordinates };
+      updateData.location.coordinates = geoCoordinates;
     }
 
     const updatedProperty = await Property.findByIdAndUpdate(

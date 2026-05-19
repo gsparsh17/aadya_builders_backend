@@ -510,6 +510,10 @@ class AdminController {
       const redisClient = require('../../config/redis');
       const client = await redisClient.getRedisClient();
       
+      if (!client) {
+        return successResponse(res, null, 'Cache is currently disabled or unavailable');
+      }
+
       const { pattern } = req.body;
       
       if (pattern) {

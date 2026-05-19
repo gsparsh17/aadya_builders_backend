@@ -421,8 +421,10 @@ class DashboardService {
     let redisStatus = 'disconnected';
     try {
       const client = await redisClient.getRedisClient();
-      await client.ping();
-      redisStatus = 'connected';
+      if (client) {
+        await client.ping();
+        redisStatus = 'connected';
+      }
     } catch (error) {
       redisStatus = 'disconnected';
     }

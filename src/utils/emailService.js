@@ -21,6 +21,12 @@ const createTransporter = () => {
  * Send email
  */
 const sendEmail = async (options) => {
+  // Skip sending if email credentials are not configured
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    logger.warn('Email credentials not configured. Skipping email: ' + options.subject);
+    return null;
+  }
+
   try {
     const transporter = createTransporter();
     

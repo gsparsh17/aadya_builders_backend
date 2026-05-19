@@ -517,6 +517,7 @@ class ContentService {
   async clearContentCache() {
     try {
       const client = await redisClient.getRedisClient();
+      if (!client) return;
       const keys = await client.keys('content:*');
       if (keys.length > 0) {
         await client.del(keys);

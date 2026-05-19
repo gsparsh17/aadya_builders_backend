@@ -34,7 +34,7 @@ class SearchService {
       // Try to get from cache
       if (useCache) {
         const cachedResult = await redisClient.getRedisClient().then(client => 
-          client.get(cacheKey)
+          client ? client.get(cacheKey) : null
         ).catch(() => null);
         
         if (cachedResult) {
@@ -83,9 +83,11 @@ class SearchService {
       
       // Cache result for 5 minutes
       if (useCache) {
-        redisClient.getRedisClient().then(client => 
-          client.setEx(cacheKey, 300, JSON.stringify(result))
-        ).catch(err => logger.error('Failed to cache search results:', err));
+        redisClient.getRedisClient().then(client => {
+          if (client) {
+            return client.setEx(cacheKey, 300, JSON.stringify(result));
+          }
+        }).catch(err => logger.error('Failed to cache search results:', err));
       }
       
       return result;
@@ -235,11 +237,12 @@ class SearchService {
     }
     
     if (type === 'all' || type === 'project') {
+      // Project model is not yet implemented
+      /*
       const projects = await Property.distinct('project', {
         status: 'active'
       });
       
-      // Lookup project names
       const Project = require('../properties/property.model').db.model('Project');
       const projectResults = await Project.find({
         name: searchRegex,
@@ -254,6 +257,7 @@ class SearchService {
           highlight: query
         });
       });
+      */
     }
     
     if (type === 'all' || type === 'society') {
