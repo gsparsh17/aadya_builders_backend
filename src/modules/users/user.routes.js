@@ -6,6 +6,7 @@ const { authorize } = require('../../middlewares/role.middleware');
 const uploadMiddleware = require('../../middlewares/upload.middleware');
 const { validate } = require('../../middlewares/validation.middleware');
 const { body, param, query } = require('express-validator');
+const { successResponse, errorResponse } = require('../../utils/responseHandler');
 
 // All routes require authentication
 router.use(authMiddleware);
@@ -251,7 +252,6 @@ router.put('/:userId/status',
       const { isActive, blockReason } = req.body;
       
       const User = require('./user.model');
-      const { successResponse, errorResponse } = require('../../utils/responseHandler');
       
       const user = await User.findById(userId);
       

@@ -126,7 +126,10 @@ const propertySchema = new mongoose.Schema({
     type: String,
     enum: ['north', 'south', 'east', 'west', 'north_east', 'north_west', 'south_east', 'south_west']
   },
-  overlooking: [String],
+  overlooking: {
+    type: [String],
+    default: []  // ✅ Initialize as empty array
+  },
 
   // Location
   location: {
@@ -173,8 +176,8 @@ const propertySchema = new mongoose.Schema({
   },
 
   // Amenities
-  amenities: [{
-    type: String,
+  amenities: {
+    type: [String],
     enum: [
       'lift', 'parking', 'power_backup', 'security', 'gym',
       'swimming_pool', 'club_house', 'park', 'play_area',
@@ -182,40 +185,47 @@ const propertySchema = new mongoose.Schema({
       'air_conditioning', 'heating', 'intercom', 'wifi',
       'piped_gas', 'water_storage', 'visitor_parking',
       'service_lift', 'shopping_center', 'hospital', 'school'
-    ]
-  }],
+    ],
+    default: []  // ✅ Initialize as empty array
+  },
 
   // Media
-  images: [{
-    url: {
-      type: String,
-      required: true
-    },
-    publicId: String, // For cloud storage
-    caption: String,
-    isPrimary: {
-      type: Boolean,
-      default: false
-    },
-    order: {
-      type: Number,
-      default: 0
-    },
-    uploadedAt: {
-      type: Date,
-      default: Date.now
-    }
-  }],
+  images: {
+    type: [{
+      url: {
+        type: String,
+        required: true
+      },
+      publicId: String, // For cloud storage
+      caption: String,
+      isPrimary: {
+        type: Boolean,
+        default: false
+      },
+      order: {
+        type: Number,
+        default: 0
+      },
+      uploadedAt: {
+        type: Date,
+        default: Date.now
+      }
+    }],
+    default: []  // ✅ Initialize as empty array
+  },
   videoTour: {
     type: String,
     match: [/^(https?\:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+$/, 'Please provide a valid YouTube URL']
   },
   virtualTour: String, // 360° tour URL
-  floorPlan: [{
-    title: String,
-    imageUrl: String,
-    description: String
-  }],
+  floorPlan: {
+    type: [{
+      title: String,
+      imageUrl: String,
+      description: String
+    }],
+    default: []  // ✅ Initialize as empty array
+  },
   brochure: String, // PDF brochure URL
 
   // Ownership & Legal
@@ -240,10 +250,11 @@ const propertySchema = new mongoose.Schema({
 
   // Additional Information
   availableFrom: Date,
-  preferredTenants: [{
-    type: String,
-    enum: ['family', 'bachelor', 'company', 'students', 'any']
-  }],
+  preferredTenants: {
+    type: [String],
+    enum: ['family', 'bachelor', 'company', 'students', 'any'],
+    default: []  // ✅ Initialize as empty array
+  },
   restrictions: {
     petsAllowed: { type: Boolean, default: false },
     nonVegAllowed: { type: Boolean, default: true },
@@ -252,15 +263,18 @@ const propertySchema = new mongoose.Schema({
   },
 
   // Nearby Places
-  nearbyPlaces: [{
-    type: {
-      type: String,
-      enum: ['school', 'hospital', 'metro', 'market', 'mall', 'airport', 'railway', 'bus_stop']
-    },
-    name: String,
-    distance: Number, // in km
-    duration: Number // in minutes
-  }],
+  nearbyPlaces: {
+    type: [{
+      type: {
+        type: String,
+        enum: ['school', 'hospital', 'metro', 'market', 'mall', 'airport', 'railway', 'bus_stop']
+      },
+      name: String,
+      distance: Number, // in km
+      duration: Number // in minutes
+    }],
+    default: []  // ✅ Initialize as empty array
+  },
 
   // Status & Visibility
   status: {
@@ -349,7 +363,10 @@ const propertySchema = new mongoose.Schema({
   // SEO
   metaTitle: String,
   metaDescription: String,
-  metaKeywords: [String],
+  metaKeywords: {
+    type: [String],
+    default: []  // ✅ Initialize as empty array
+  },
   slug: {
     type: String,
     unique: true,
@@ -368,15 +385,16 @@ const propertySchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-// Virtual for display price
+// ✅ SAFE VIRTUAL: Display price with null checks
 propertySchema.virtual('displayPrice').get(function () {
-  if (this.purpose.includes('rent') || this.purpose.includes('lease')) {
+  if (!this.price) return 'Price on request';
+  if (this.purpose?.includes('rent') || this.purpose?.includes('lease')) {
     return `₹${this.price.toLocaleString('en-IN')}/month`;
   }
   return `₹${this.price.toLocaleString('en-IN')}`;
 });
 
-// Virtual for area in sqft
+// ✅ SAFE VIRTUAL: Area in sqft with proper checks
 propertySchema.virtual('areaInSqft').get(function () {
   const conversionRates = {
     sqft: 1,
@@ -385,11 +403,18 @@ propertySchema.virtual('areaInSqft').get(function () {
     acre: 43560,
     hectare: 107639
   };
+
+  if (!this.area || !this.area.value || !this.area.unit) {
+    return 0;
+  }
+
   return this.area.value * (conversionRates[this.area.unit] || 1);
 });
 
-// Virtual for full location
+// ✅ SAFE VIRTUAL: Full location with null checks
 propertySchema.virtual('fullLocation').get(function () {
+  if (!this.location) return 'Location not specified';
+
   const parts = [
     this.location.address,
     this.location.landmark,
@@ -398,31 +423,71 @@ propertySchema.virtual('fullLocation').get(function () {
     this.location.state,
     this.location.pincode
   ];
-  return parts.filter(Boolean).join(', ');
+  return parts.filter(Boolean).join(', ') || 'Location not specified';
 });
 
-// Virtual for primary image
+// ✅ SAFE VIRTUAL: Primary image with null checks and array validation
 propertySchema.virtual('primaryImage').get(function () {
-  const primary = this.images.find(img => img.isPrimary);
+  // Safely check if images array exists and has items
+  if (!this.images || !Array.isArray(this.images) || this.images.length === 0) {
+    return null;
+  }
+
+  // Find primary image or fallback to first image
+  const primary = this.images.find(img => img && img.isPrimary === true);
   return primary?.url || this.images[0]?.url || null;
 });
 
+// ✅ SAFE VIRTUAL: All images URLs for quick access
+propertySchema.virtual('imageUrls').get(function () {
+  if (!this.images || !Array.isArray(this.images)) {
+    return [];
+  }
+  return this.images.map(img => img?.url).filter(Boolean);
+});
+
+// ✅ SAFE VIRTUAL: First floor plan image
+propertySchema.virtual('primaryFloorPlan').get(function () {
+  if (!this.floorPlan || !Array.isArray(this.floorPlan) || this.floorPlan.length === 0) {
+    return null;
+  }
+  return this.floorPlan[0]?.imageUrl || null;
+});
+
+// ✅ SAFE VIRTUAL: Top amenities (first 5)
+propertySchema.virtual('topAmenities').get(function () {
+  if (!this.amenities || !Array.isArray(this.amenities)) {
+    return [];
+  }
+  return this.amenities.slice(0, 5);
+});
+
+// ✅ SAFE VIRTUAL: Whether property has images
+propertySchema.virtual('hasImages').get(function () {
+  return this.images && Array.isArray(this.images) && this.images.length > 0;
+});
+
+// ✅ SAFE VIRTUAL: Image count
+propertySchema.virtual('imageCount').get(function () {
+  return this.images && Array.isArray(this.images) ? this.images.length : 0;
+});
+
 // Pre-save hook to generate property code, slug, and calculate fields
-propertySchema.pre('save', function () {
+propertySchema.pre('save', async function () {
   const property = this;
 
   // Generate property code if not exists
   if (!property.propertyCode) {
-    const prefix = property.purpose.substring(0, 1).toUpperCase();
-    const typePrefix = property.propertyType.substring(0, 2).toUpperCase();
+    const prefix = property.purpose ? property.purpose.substring(0, 1).toUpperCase() : 'P';
+    const typePrefix = property.propertyType ? property.propertyType.substring(0, 2).toUpperCase() : 'PR';
     const timestamp = Date.now().toString().slice(-8);
     const random = Math.random().toString(36).substring(2, 6).toUpperCase();
     property.propertyCode = `${prefix}${typePrefix}${timestamp}${random}`;
   }
 
   // Generate slug if not exists
-  if (!property.slug) {
-    const baseSlug = `${property.title}-${property.location.locality}-${property.location.city}`
+  if (!property.slug && property.title && property.location) {
+    const baseSlug = `${property.title}-${property.location.locality || ''}-${property.location.city || ''}`
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '');
@@ -437,12 +502,28 @@ propertySchema.pre('save', function () {
     }
   }
 
+  // Ensure all array fields are initialized
+  const arrayFields = ['overlooking', 'amenities', 'images', 'floorPlan', 'preferredTenants', 'nearbyPlaces', 'metaKeywords'];
+  arrayFields.forEach(field => {
+    if (!property[field]) {
+      property[field] = [];
+    }
+  });
+
   // Calculate ranking score
   if (typeof property.calculateRankingScore === 'function') {
     property.calculateRankingScore();
   }
+});
 
-  // No next() call needed - synchronous pre-save hook
+// Post-init hook to ensure arrays are always defined (fixes existing documents)
+propertySchema.post('init', function (doc) {
+  const arrayFields = ['overlooking', 'amenities', 'images', 'floorPlan', 'preferredTenants', 'nearbyPlaces', 'metaKeywords'];
+  arrayFields.forEach(field => {
+    if (!doc[field]) {
+      doc[field] = [];
+    }
+  });
 });
 
 // Method to calculate ranking score
@@ -466,9 +547,11 @@ propertySchema.methods.calculateRankingScore = function () {
   score += planScores[this.listingPlan?.type] || 0;
 
   // Recency bonus (newer = higher)
-  const daysSinceCreation = (Date.now() - this.createdAt) / (1000 * 60 * 60 * 24);
-  if (daysSinceCreation < 30) {
-    score += Math.floor(30 - daysSinceCreation);
+  if (this.createdAt) {
+    const daysSinceCreation = (Date.now() - this.createdAt) / (1000 * 60 * 60 * 24);
+    if (daysSinceCreation < 30) {
+      score += Math.floor(30 - daysSinceCreation);
+    }
   }
 
   // Engagement bonus
@@ -476,8 +559,9 @@ propertySchema.methods.calculateRankingScore = function () {
   score += Math.min(this.leads * 2, 30);
   score += Math.min(this.favorites * 3, 30);
 
-  // Image bonus
-  score += Math.min(this.images.length * 5, 25);
+  // Image bonus (safe access)
+  const imageCount = this.images && Array.isArray(this.images) ? this.images.length : 0;
+  score += Math.min(imageCount * 5, 25);
 
   this.rankingScore = Math.floor(score);
   return this.rankingScore;
@@ -494,6 +578,30 @@ propertySchema.methods.trackUniqueView = async function (userId) {
   // Implementation would use Redis for tracking unique views
   this.uniqueViews += 1;
   return this.save();
+};
+
+// ✅ SAFE METHOD: Get image by ID
+propertySchema.methods.getImageById = function (imageId) {
+  if (!this.images || !Array.isArray(this.images)) {
+    return null;
+  }
+  return this.images.find(img => img._id && img._id.toString() === imageId);
+};
+
+// ✅ SAFE METHOD: Set primary image
+propertySchema.methods.setPrimaryImage = function (imageId) {
+  if (!this.images || !Array.isArray(this.images)) {
+    return false;
+  }
+
+  this.images.forEach(img => {
+    if (img._id && img._id.toString() === imageId) {
+      img.isPrimary = true;
+    } else if (img.isPrimary) {
+      img.isPrimary = false;
+    }
+  });
+  return true;
 };
 
 // Indexes

@@ -149,7 +149,7 @@ class PropertyService {
   async getPropertyById(propertyId, userId = null) {
     const property = await Property.findById(propertyId)
       .populate('owner', 'name email phone profilePicture role isVerified companyDetails');
-      // .populate('project', 'name builder totalUnits possessionDate');
+    // .populate('project', 'name builder totalUnits possessionDate');
 
     if (!property) {
       throw new AppError('Property not found', 404, 'PROPERTY_NOT_FOUND');
@@ -649,33 +649,57 @@ class PropertyService {
    * Add images to property
    */
   async addPropertyImages(propertyId, userId, images) {
-    const property = await Property.findById(propertyId);
+    try {
+      // First verify ownership
+      const property = await Property.findById(propertyId).select('owner images');
 
-    if (!property) {
-      throw new AppError('Property not found', 404, 'PROPERTY_NOT_FOUND');
+      if (!property) {
+        throw new AppError('Property not found', 404, 'PROPERTY_NOT_FOUND');
+      }
+
+      if (property.owner.toString() !== userId) {
+        throw new AppError('You do not have permission to modify this property', 403, 'FORBIDDEN');
+      }
+
+      // Check image limit
+      const currentImageCount = property.images?.length || 0;
+      if (currentImageCount + images.length > 20) {
+        throw new AppError('Maximum 20 images allowed per property', 400, 'IMAGE_LIMIT_EXCEEDED');
+      }
+
+      // Prepare new images
+      const newImages = images.map((img, index) => ({
+        url: img.url,
+        publicId: img.publicId || null,
+        caption: img.caption || '',
+        isPrimary: currentImageCount === 0 && index === 0,
+        order: currentImageCount + index,
+        uploadedAt: new Date()
+      }));
+
+      // Use updateOne with $push to avoid pre-save hooks
+      const result = await Property.updateOne(
+        { _id: propertyId },
+        { $push: { images: { $each: newImages } } }
+      );
+
+      if (result.modifiedCount === 0) {
+        throw new AppError('Failed to add images', 500, 'UPDATE_FAILED');
+      }
+
+      // Fetch updated property to return images
+      const updatedProperty = await Property.findById(propertyId).select('images');
+      return updatedProperty.images;
+
+    } catch (error) {
+      console.error('Error in addPropertyImages:', error);
+
+      if (error.isOperational) {
+        throw error;
+      }
+
+      throw new AppError('Failed to save images. Please try again.', 500, 'SAVE_FAILED');
     }
-
-    if (property.owner.toString() !== userId) {
-      throw new AppError('You do not have permission to modify this property', 403, 'FORBIDDEN');
-    }
-
-    // Check image limit
-    if (property.images.length + images.length > 20) {
-      throw new AppError('Maximum 20 images allowed per property', 400, 'IMAGE_LIMIT_EXCEEDED');
-    }
-
-    const newImages = images.map((img, index) => ({
-      url: img.url || img.location || img.path,
-      caption: img.caption || '',
-      isPrimary: property.images.length === 0 && index === 0,
-      order: property.images.length + index,
-      uploadedAt: new Date()
-    }));
-
-    property.images.push(...newImages);
-    await property.save();
-
-    return property.images;
   }
 
   /**

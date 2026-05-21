@@ -17,7 +17,7 @@ const leadSchema = new mongoose.Schema({
     ref: 'User',
     required: [true, 'Owner reference is required']
   },
-  
+
   // Lead Details
   message: {
     type: String,
@@ -33,7 +33,7 @@ const leadSchema = new mongoose.Schema({
     enum: ['morning', 'afternoon', 'evening', 'anytime'],
     default: 'anytime'
   },
-  
+
   // Buyer Information Snapshot (at time of lead)
   buyerSnapshot: {
     name: String,
@@ -41,7 +41,7 @@ const leadSchema = new mongoose.Schema({
     phone: String,
     profilePicture: String
   },
-  
+
   // Property Information Snapshot
   propertySnapshot: {
     title: String,
@@ -53,22 +53,22 @@ const leadSchema = new mongoose.Schema({
     },
     primaryImage: String
   },
-  
+
   // Lead Status
   status: {
     type: String,
-    enum: ['new', 'viewed', 'contacted', 'negotiating', 'site_visit_scheduled', 
-           'site_visit_done', 'offer_made', 'closed_won', 'closed_lost', 'rejected', 'spam'],
+    enum: ['new', 'viewed', 'contacted', 'negotiating', 'site_visit_scheduled',
+      'site_visit_done', 'offer_made', 'closed_won', 'closed_lost', 'rejected', 'spam'],
     default: 'new'
   },
-  
+
   // Contact Information Sharing
   contactShared: {
     type: Boolean,
     default: false
   },
   contactSharedAt: Date,
-  
+
   // Communication History
   communications: [{
     type: {
@@ -91,7 +91,7 @@ const leadSchema = new mongoose.Schema({
       default: Date.now
     }
   }],
-  
+
   // Notes (internal for owner)
   notes: [{
     text: {
@@ -111,7 +111,7 @@ const leadSchema = new mongoose.Schema({
       default: Date.now
     }
   }],
-  
+
   // Follow-up
   followUp: {
     scheduled: Boolean,
@@ -120,7 +120,7 @@ const leadSchema = new mongoose.Schema({
     reminderSent: { type: Boolean, default: false },
     notes: String
   },
-  
+
   // Offer Details (if applicable)
   offer: {
     amount: Number,
@@ -133,7 +133,7 @@ const leadSchema = new mongoose.Schema({
     counterOffer: Number,
     notes: String
   },
-  
+
   // Site Visit
   siteVisit: {
     scheduled: Boolean,
@@ -143,7 +143,7 @@ const leadSchema = new mongoose.Schema({
     feedback: String,
     rating: { type: Number, min: 1, max: 5 }
   },
-  
+
   // Deal Closing
   closedDetails: {
     closedAt: Date,
@@ -152,7 +152,7 @@ const leadSchema = new mongoose.Schema({
     agreementUrl: String,
     notes: String
   },
-  
+
   // Ratings and Feedback
   rating: {
     given: { type: Boolean, default: false },
@@ -164,7 +164,7 @@ const leadSchema = new mongoose.Schema({
     },
     ratedAt: Date
   },
-  
+
   // Spam Detection
   isSpam: {
     type: Boolean,
@@ -177,7 +177,7 @@ const leadSchema = new mongoose.Schema({
     default: 0
   },
   spamReasons: [String],
-  
+
   // Metadata
   source: {
     type: String,
@@ -187,7 +187,7 @@ const leadSchema = new mongoose.Schema({
   campaign: String,
   ipAddress: String,
   userAgent: String,
-  
+
   // Timestamps for status changes
   statusHistory: [{
     status: String,
@@ -198,7 +198,7 @@ const leadSchema = new mongoose.Schema({
     },
     notes: String
   }]
-  
+
 }, {
   timestamps: true
 });
@@ -216,7 +216,7 @@ leadSchema.index({ 'followUp.scheduledDate': 1 }, { sparse: true });
 leadSchema.index({ isSpam: 1 });
 
 // Pre-save hook to capture snapshots
-leadSchema.pre('save', async function(next) {
+leadSchema.pre('save', async function () {
   if (this.isNew) {
     // Capture buyer snapshot
     if (this.buyer && !this.buyerSnapshot.name) {
@@ -231,7 +231,7 @@ leadSchema.pre('save', async function(next) {
         };
       }
     }
-    
+
     // Capture property snapshot
     if (this.property && !this.propertySnapshot.title) {
       const Property = mongoose.model('Property');
@@ -250,14 +250,14 @@ leadSchema.pre('save', async function(next) {
         };
       }
     }
-    
+
     // Add status history entry
     this.statusHistory.push({
       status: this.status,
       notes: 'Lead created'
     });
   }
-  
+
   // Track status changes
   if (this.isModified('status') && !this.isNew) {
     this.statusHistory.push({
@@ -266,12 +266,10 @@ leadSchema.pre('save', async function(next) {
       notes: `Status changed to ${this.status}`
     });
   }
-  
-  next();
 });
 
 // Post-save hook to update property lead count
-leadSchema.post('save', async function() {
+leadSchema.post('save', async function () {
   if (this.isNew) {
     const Property = mongoose.model('Property');
     await Property.findByIdAndUpdate(this.property, {
@@ -281,11 +279,11 @@ leadSchema.post('save', async function() {
 });
 
 // Method to mark as contacted
-leadSchema.methods.markAsContacted = async function(userId, notes) {
+leadSchema.methods.markAsContacted = async function (userId, notes) {
   this.status = 'contacted';
   this.contactShared = true;
   this.contactSharedAt = new Date();
-  
+
   this.communications.push({
     type: 'note',
     direction: 'outgoing',
@@ -293,12 +291,12 @@ leadSchema.methods.markAsContacted = async function(userId, notes) {
     content: notes || 'Marked as contacted',
     createdAt: new Date()
   });
-  
+
   return this.save();
 };
 
 // Method to schedule follow-up
-leadSchema.methods.scheduleFollowUp = async function(date, notes) {
+leadSchema.methods.scheduleFollowUp = async function (date, notes) {
   this.followUp = {
     scheduled: true,
     scheduledDate: date,
@@ -306,42 +304,42 @@ leadSchema.methods.scheduleFollowUp = async function(date, notes) {
     reminderSent: false,
     notes: notes
   };
-  
+
   return this.save();
 };
 
 // Method to add communication
-leadSchema.methods.addCommunication = async function(commData) {
+leadSchema.methods.addCommunication = async function (commData) {
   this.communications.push({
     ...commData,
     createdAt: new Date()
   });
-  
+
   // Update status if still new
   if (this.status === 'new') {
     this.status = 'viewed';
   }
-  
+
   return this.save();
 };
 
 // Method to calculate spam score
-leadSchema.methods.calculateSpamScore = async function() {
+leadSchema.methods.calculateSpamScore = async function () {
   let score = 0;
   const reasons = [];
-  
+
   // Check for duplicate leads
   const Lead = mongoose.model('Lead');
   const recentLeads = await Lead.countDocuments({
     buyer: this.buyer,
     createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
   });
-  
+
   if (recentLeads > 10) {
     score += 50;
     reasons.push('High volume of leads in 24 hours');
   }
-  
+
   // Check message content
   if (this.message) {
     // Check for common spam patterns
@@ -352,14 +350,14 @@ leadSchema.methods.calculateSpamScore = async function() {
       score += 30;
       reasons.push('Message contains spam keywords');
     }
-    
+
     // Check message length
     if (this.message.length < 10) {
       score += 10;
       reasons.push('Very short message');
     }
   }
-  
+
   // Check buyer account age
   const User = mongoose.model('User');
   const buyer = await User.findById(this.buyer);
@@ -369,17 +367,17 @@ leadSchema.methods.calculateSpamScore = async function() {
       score += 20;
       reasons.push('New account (less than 1 day old)');
     }
-    
+
     if (!buyer.phoneVerified && !buyer.emailVerified) {
       score += 20;
       reasons.push('Unverified account');
     }
   }
-  
+
   this.spamScore = Math.min(score, 100);
   this.spamReasons = reasons;
   this.isSpam = this.spamScore >= 50;
-  
+
   return this.spamScore;
 };
 
