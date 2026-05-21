@@ -404,13 +404,24 @@ class AdminController {
    */
   async createPlan(req, res, next) {
     try {
-      const plan = await SubscriptionPlan.create({
-        ...req.body,
-        createdBy: req.user.id
-      });
+      let planData = { ...req.body, createdBy: req.user.id };
+      
+      // Ensure features and benefits are arrays
+      if (planData.features && !Array.isArray(planData.features)) {
+        planData.features = [];
+      }
+      if (planData.benefits && !Array.isArray(planData.benefits)) {
+        planData.benefits = [];
+      }
+      
+      const plan = await SubscriptionPlan.create(planData);
       
       return successResponse(res, plan, 'Plan created successfully', 201);
     } catch (error) {
+      // Handle duplicate key error
+      if (error.code === 11000) {
+        return next(new AppError('Plan with this name or code already exists', 400, 'DUPLICATE_PLAN'));
+      }
       next(error);
     }
   }
@@ -422,10 +433,24 @@ class AdminController {
   async updatePlan(req, res, next) {
     try {
       const { planId } = req.params;
+      const updateData = { ...req.body };
+      
+      // Remove fields that shouldn't be updated directly
+      delete updateData._id;
+      delete updateData.createdAt;
+      delete updateData.updatedAt;
+      
+      // Ensure features and benefits are arrays
+      if (updateData.features && !Array.isArray(updateData.features)) {
+        updateData.features = [];
+      }
+      if (updateData.benefits && !Array.isArray(updateData.benefits)) {
+        updateData.benefits = [];
+      }
       
       const plan = await SubscriptionPlan.findByIdAndUpdate(
         planId,
-        req.body,
+        updateData,
         { new: true, runValidators: true }
       );
       

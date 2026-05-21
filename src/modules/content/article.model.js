@@ -177,8 +177,9 @@ const articleSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Pre-save hook to generate slug
-articleSchema.pre('save', async function(next) {
+// ✅ FIXED: Pre-save hook - removed 'next' parameter, using async function
+articleSchema.pre('save', async function() {
+  // Generate slug if title is modified or slug doesn't exist
   if (this.isModified('title') || !this.slug) {
     let baseSlug = slugify(this.title, {
       lower: true,
@@ -222,8 +223,6 @@ articleSchema.pre('save', async function(next) {
   if (!this.metaDescription && this.excerpt) {
     this.metaDescription = this.excerpt.substring(0, 160);
   }
-  
-  next();
 });
 
 // Method to increment views

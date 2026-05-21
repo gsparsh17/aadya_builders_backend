@@ -68,19 +68,17 @@ const subscriptionPlanSchema = new mongoose.Schema({
     default: 0
   },
   
-  // Features
-  features: [{
-    name: String,
-    description: String,
-    included: { type: Boolean, default: true }
-  }],
+  // Features - Simplified to array of strings for easier frontend integration
+  features: {
+    type: [String],
+    default: []
+  },
   
-  // Benefits
-  benefits: [{
-    icon: String,
-    title: String,
-    description: String
-  }],
+  // Benefits - Simplified to array of strings
+  benefits: {
+    type: [String],
+    default: []
+  },
   
   // Visibility Settings
   searchPriority: {
@@ -142,11 +140,14 @@ const subscriptionPlanSchema = new mongoose.Schema({
   }
   
 }, {
-  timestamps: true
+  timestamps: true,
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
 });
 
-// Pre-save hook to generate code
-subscriptionPlanSchema.pre('save', function(next) {
+// ✅ FIXED: Pre-save hook - removed 'next' parameter
+subscriptionPlanSchema.pre('save', function() {
+  // Generate code from name if not provided
   if (!this.code) {
     this.code = this.name.toUpperCase().replace(/[^A-Z0-9]/g, '_');
   }
@@ -156,7 +157,9 @@ subscriptionPlanSchema.pre('save', function(next) {
     this.discountPercentage = Math.round(((this.price - this.discountPrice) / this.price) * 100);
   }
   
-  next();
+  // Ensure features and benefits are arrays
+  if (!this.features) this.features = [];
+  if (!this.benefits) this.benefits = [];
 });
 
 // Virtual for display price with GST
