@@ -46,6 +46,23 @@ router.get(
   propertyController.getPropertyByCode
 );
 
+// ==================== Parameter Routes ====================
+
+router.get(
+  '/:id',
+  optionalAuth,
+  propertyValidation.getById,
+  validate,
+  propertyController.getPropertyById
+);
+
+router.get(
+  '/:id/similar',
+  propertyValidation.getSimilar,
+  validate,
+  propertyController.getSimilarProperties
+);
+
 // ==================== Protected Routes ====================
 
 router.use(authMiddleware);
@@ -68,22 +85,7 @@ router.get(
   propertyController.adminGetAllProperties
 );
 
-// ==================== Parameter Routes ====================
-
-router.get(
-  '/:id',
-  optionalAuth,
-  propertyValidation.getById,
-  validate,
-  propertyController.getPropertyById
-);
-
-router.get(
-  '/:id/similar',
-  propertyValidation.getSimilar,
-  validate,
-  propertyController.getSimilarProperties
-);
+// ==================== Protected Parameter Routes ====================
 
 router.put(
   '/:id',
