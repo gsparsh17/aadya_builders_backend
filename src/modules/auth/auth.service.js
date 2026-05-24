@@ -7,6 +7,7 @@ const logger = require('../../utils/logger');
 const emailService = require('../../utils/emailService');
 const smsService = require('../../utils/smsService');
 const userService = require('../users/user.service');
+const oneSignalService = require('../../utils/onesignal.service');
 
 /**
  * Auth Service - Handles authentication business logic
@@ -96,6 +97,24 @@ class AuthService {
     // Log login history
     await this.logLoginAttempt(user._id, ipAddress, userAgent, 'success', 'registration');
     
+    // Send Welcome Push Notification (non-blocking)
+    const pushTitle = "Welcome to Aadya Acres! 🎉";
+    const pushMsg = "We're excited to have you here. Complete your profile to get started!";
+    oneSignalService.sendPushNotification(
+      [user._id.toString()],
+      pushTitle,
+      pushMsg
+    ).catch(err => logger.error('Failed to send welcome push:', err));
+
+    // Save to Notification DB
+    const Notification = require('../notifications/notification.model');
+    Notification.create({
+      recipient: user._id,
+      title: pushTitle,
+      message: pushMsg,
+      type: 'welcome'
+    }).catch(err => logger.error('Notification DB save failed:', err));
+
     // Generate tokens
     const tokens = this.generateTokens(user);
     

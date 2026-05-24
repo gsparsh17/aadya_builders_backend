@@ -378,7 +378,7 @@ class AuthController {
    */
   async getCurrentUser(req, res, next) {
     try {
-      const user = await userService.getUserById(req.user.id);
+      const user = await userService.getUserById(req.user.id, ['subscription.plan']);
 
       return successResponse(res, { user }, 'User retrieved successfully');
     } catch (error) {

@@ -3,8 +3,7 @@ const { successResponse, paginatedResponse, errorResponse } = require('../../uti
 const { AppError } = require('../../middlewares/errorHandler');
 const logger = require('../../utils/logger');
 const { validationResult } = require('express-validator');
-const fs = require('fs');
-const path = require('path');
+const { uploadToCloudinary } = require('../../config/cloudinary');
 
 /**
  * Property Controller - Handles HTTP requests for property operations
@@ -261,151 +260,104 @@ class PropertyController {
     }
   }
 
-  //   async uploadImages(req, res, next) {
-  //   try {
-  //     const { id } = req.params;
-
-  //     const files = req.files || (req.file ? [req.file] : null);
-
-  //     if (!files || files.length === 0) {
-  //       throw new AppError('Please upload at least one image', 400, 'NO_IMAGES');
-  //     }
-
-  //     const images = files.map(file => {
-  //       // Cloud storage typically provides location/url property
-  //       let url = file.location || file.secure_url || file.url || file.path;
-
-  //       if (!url && file.key && process.env.AWS_BUCKET_NAME) {
-  //         url = `https://${process.env.AWS_BUCKET_NAME}.s3.amazonaws.com/${file.key}`;
-  //       }
-
-  //       if (!url) {
-  //         throw new AppError(`Could not determine image URL for ${file.originalname}`, 400, 'INVALID_UPLOAD');
-  //       }
-
-  //       return {
-  //         url: url,
-  //         caption: req.body.caption || '',
-  //         isPrimary: false,
-  //         order: 0
-  //       };
-  //     });
-
-  //     const propertyImages = await propertyService.addPropertyImages(id, req.user.id, images);
-
-  //     return successResponse(res, propertyImages, 'Images uploaded successfully');
-  //   } catch (error) {
-  //     console.error('Upload images error:', error);
-  //     next(error);
-  //   }
-  // }
-
   /**
-   * Upload property images
+   * Upload property images to Cloudinary
    * @route POST /api/v1/properties/:id/images
    */
   async uploadImages(req, res, next) {
     try {
       const { id } = req.params;
 
-      // Get files from request
       const files = req.files || (req.file ? [req.file] : null);
 
       if (!files || files.length === 0) {
         throw new AppError('Please upload at least one image', 400, 'NO_IMAGES');
       }
 
-      const baseUrl = `${req.protocol}://${req.get('host')}`;
       const images = [];
 
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        let url = null;
 
-        // Check if file was saved to disk (has path)
-        if (file.path) {
-          // File saved to disk - create URL from path
-          let relativePath = file.path;
-
-          // Convert Windows backslashes to forward slashes
-          relativePath = relativePath.replace(/\\/g, '/');
-
-          // Extract the part after 'uploads' or use relative path
-          if (relativePath.includes('uploads')) {
-            relativePath = relativePath.substring(relativePath.indexOf('uploads'));
-          } else {
-            // Just use the filename
-            relativePath = `uploads/${file.filename}`;
-          }
-
-          url = `${baseUrl}/${relativePath}`;
-        }
-        // Check if file has filename but no path (memory storage)
-        else if (file.filename) {
-          url = `${baseUrl}/uploads/${file.filename}`;
-        }
-        // Check if it's a cloud storage URL
-        else if (file.location) {
-          url = file.location;
-        }
-        else if (file.secure_url) {
-          url = file.secure_url;
-        }
-        else if (file.url) {
-          url = file.url;
-        }
-
-        if (!url) {
-          // For memory storage without disk save, we need to save the file manually
-          console.log('File is in memory, need to save to disk');
-
-          // Generate filename
-          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-          const ext = path.extname(file.originalname);
-          const filename = `property-${uniqueSuffix}${ext}`;
-          const uploadPath = path.join(__dirname, '../../uploads/properties', filename);
-
-          // Ensure directory exists
-          const uploadDir = path.join(__dirname, '../../uploads/properties');
-          if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir, { recursive: true });
-          }
-
-          // Save buffer to disk
-          fs.writeFileSync(uploadPath, file.buffer);
-
-          // Create URL
-          url = `${baseUrl}/uploads/properties/${filename}`;
-        }
-
-        if (!url) {
-          throw new AppError(`Could not determine image URL for file: ${file.originalname}`, 400, 'INVALID_UPLOAD');
-        }
+        // Upload to Cloudinary
+        const result = await uploadToCloudinary(file.buffer, {
+          folder: 'aadya/properties/images',
+          resourceType: 'image'
+        });
 
         images.push({
-          url: url,
+          url: result.secure_url,
+          publicId: result.public_id,
           caption: req.body.caption || '',
-          isPrimary: i === 0, // First image becomes primary
+          isPrimary: i === 0,
           order: i,
           uploadedAt: new Date()
         });
       }
 
-      console.log('Uploaded images:', images.map(img => ({ url: img.url, isPrimary: img.isPrimary })));
+      logger.info(`Uploaded ${images.length} image(s) to Cloudinary for property ${id}`);
 
-      // Add images to property
       const propertyImages = await propertyService.addPropertyImages(id, req.user.id, images);
 
       return successResponse(res, propertyImages, `${images.length} image(s) uploaded successfully`);
-
     } catch (error) {
-      console.error('Upload images error:', error);
+      logger.error('Upload images error:', error);
       next(error);
     }
   }
 
   /**
-   * Delete property image
+   * Upload property videos to Cloudinary
+   * @route POST /api/v1/properties/:id/videos
+   */
+  async uploadVideos(req, res, next) {
+    try {
+      const { id } = req.params;
+
+      const files = req.files || (req.file ? [req.file] : null);
+
+      if (!files || files.length === 0) {
+        throw new AppError('Please upload at least one video', 400, 'NO_VIDEOS');
+      }
+
+      const videos = [];
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+
+        // Upload to Cloudinary as video
+        const result = await uploadToCloudinary(file.buffer, {
+          folder: 'aadya/properties/videos',
+          resourceType: 'video'
+        });
+
+        // Build thumbnail URL from Cloudinary's video-to-image transformation
+        const thumbnailUrl = result.secure_url.replace('/video/upload/', '/video/upload/w_400,h_300,c_fill,so_2/').replace(/\.[^.]+$/, '.jpg');
+
+        videos.push({
+          url: result.secure_url,
+          publicId: result.public_id,
+          caption: req.body.caption || '',
+          duration: result.duration || null,
+          thumbnail: thumbnailUrl,
+          order: i,
+          uploadedAt: new Date()
+        });
+      }
+
+      logger.info(`Uploaded ${videos.length} video(s) to Cloudinary for property ${id}`);
+
+      const propertyVideos = await propertyService.addPropertyVideos(id, req.user.id, videos);
+
+      return successResponse(res, propertyVideos, `${videos.length} video(s) uploaded successfully`);
+    } catch (error) {
+      logger.error('Upload videos error:', error);
+      next(error);
+    }
+  }
+
+  /**
+   * Delete property image (also removes from Cloudinary)
    * @route DELETE /api/v1/properties/:id/images/:imageId
    */
   async deleteImage(req, res, next) {
@@ -415,6 +367,22 @@ class PropertyController {
       const images = await propertyService.deletePropertyImage(id, imageId, req.user.id);
 
       return successResponse(res, images, 'Image deleted successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Delete property video (also removes from Cloudinary)
+   * @route DELETE /api/v1/properties/:id/videos/:videoId
+   */
+  async deleteVideo(req, res, next) {
+    try {
+      const { id, videoId } = req.params;
+
+      const videos = await propertyService.deletePropertyVideo(id, videoId, req.user.id);
+
+      return successResponse(res, videos, 'Video deleted successfully');
     } catch (error) {
       next(error);
     }

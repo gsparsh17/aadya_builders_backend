@@ -6,7 +6,7 @@ const { validate } = require('../../middlewares/validation.middleware');
 const { authMiddleware } = require('../../middlewares/auth.middleware');
 const { optionalAuth } = require('../../middlewares/auth.middleware');
 const { authorize } = require('../../middlewares/role.middleware');
-const uploadMiddleware = require('../../middlewares/upload.middleware');
+const { uploadImages, uploadVideos } = require('../../middlewares/upload.middleware');
 
 // ==================== Public Routes ====================
 
@@ -105,11 +105,18 @@ router.patch(
 
 router.post(
   '/:id/images',
-  uploadMiddleware.array('images', 20),
+  uploadImages.array('images', 20),
   propertyController.uploadImages
 );
 
+router.post(
+  '/:id/videos',
+  uploadVideos.array('videos', 5),
+  propertyController.uploadVideos
+);
+
 router.delete('/:id/images/:imageId', propertyController.deleteImage);
+router.delete('/:id/videos/:videoId', propertyController.deleteVideo);
 router.put('/:id/images/:imageId/primary', propertyController.setPrimaryImage);
 router.put('/:id/images/reorder', propertyController.reorderImages);
 

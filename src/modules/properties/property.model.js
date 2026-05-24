@@ -213,9 +213,26 @@ const propertySchema = new mongoose.Schema({
     }],
     default: []  // ✅ Initialize as empty array
   },
-  videoTour: {
-    type: String,
-    match: [/^(https?\:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+$/, 'Please provide a valid YouTube URL']
+  videos: {
+    type: [{
+      url: {
+        type: String,
+        required: true
+      },
+      publicId: String,
+      caption: String,
+      duration: Number,
+      thumbnail: String,
+      order: {
+        type: Number,
+        default: 0
+      },
+      uploadedAt: {
+        type: Date,
+        default: Date.now
+      }
+    }],
+    default: []
   },
   virtualTour: String, // 360° tour URL
   floorPlan: {
@@ -472,6 +489,16 @@ propertySchema.virtual('imageCount').get(function () {
   return this.images && Array.isArray(this.images) ? this.images.length : 0;
 });
 
+// ✅ SAFE VIRTUAL: Whether property has videos
+propertySchema.virtual('hasVideos').get(function () {
+  return this.videos && Array.isArray(this.videos) && this.videos.length > 0;
+});
+
+// ✅ SAFE VIRTUAL: Video count
+propertySchema.virtual('videoCount').get(function () {
+  return this.videos && Array.isArray(this.videos) ? this.videos.length : 0;
+});
+
 // Pre-save hook to generate property code, slug, and calculate fields
 propertySchema.pre('save', async function () {
   const property = this;
@@ -503,7 +530,7 @@ propertySchema.pre('save', async function () {
   }
 
   // Ensure all array fields are initialized
-  const arrayFields = ['overlooking', 'amenities', 'images', 'floorPlan', 'preferredTenants', 'nearbyPlaces', 'metaKeywords'];
+  const arrayFields = ['overlooking', 'amenities', 'images', 'videos', 'floorPlan', 'preferredTenants', 'nearbyPlaces', 'metaKeywords'];
   arrayFields.forEach(field => {
     if (!property[field]) {
       property[field] = [];
@@ -518,7 +545,7 @@ propertySchema.pre('save', async function () {
 
 // Post-init hook to ensure arrays are always defined (fixes existing documents)
 propertySchema.post('init', function (doc) {
-  const arrayFields = ['overlooking', 'amenities', 'images', 'floorPlan', 'preferredTenants', 'nearbyPlaces', 'metaKeywords'];
+  const arrayFields = ['overlooking', 'amenities', 'images', 'videos', 'floorPlan', 'preferredTenants', 'nearbyPlaces', 'metaKeywords'];
   arrayFields.forEach(field => {
     if (!doc[field]) {
       doc[field] = [];

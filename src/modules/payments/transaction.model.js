@@ -137,7 +137,7 @@ const transactionSchema = new mongoose.Schema({
 });
 
 // Pre-save hook to generate transaction and invoice numbers
-transactionSchema.pre('save', async function(next) {
+transactionSchema.pre('save', async function() {
   if (!this.transactionId) {
     const timestamp = Date.now().toString().slice(-10);
     const random = Math.random().toString(36).substring(2, 6).toUpperCase();
@@ -157,8 +157,6 @@ transactionSchema.pre('save', async function(next) {
   if (this.status === 'captured' && !this.completedAt) {
     this.completedAt = new Date();
   }
-  
-  next();
 });
 
 // Indexes

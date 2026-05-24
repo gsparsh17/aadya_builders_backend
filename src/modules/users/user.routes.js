@@ -3,7 +3,7 @@ const router = express.Router();
 const userController = require('./user.controller');
 const {authMiddleware} = require('../../middlewares/auth.middleware');
 const { authorize } = require('../../middlewares/role.middleware');
-const uploadMiddleware = require('../../middlewares/upload.middleware');
+const { uploadImages } = require('../../middlewares/upload.middleware');
 const { validate } = require('../../middlewares/validation.middleware');
 const { body, param, query } = require('express-validator');
 const { successResponse, errorResponse } = require('../../utils/responseHandler');
@@ -38,7 +38,7 @@ router.put('/password',
 );
 
 router.post('/avatar',
-  uploadMiddleware.single('avatar'),
+  uploadImages.single('avatar'),
   userController.uploadAvatar
 );
 

@@ -8,7 +8,6 @@ const path = require('path');
 // Load environment variables
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
-// Import custom modules
 const errorHandler = require('./middlewares/errorHandler');
 
 // ✅ FIX: use destructuring (IMPORTANT)
@@ -175,6 +174,8 @@ const routeModules = [
   { path: `${API_PREFIX}/insights`, module: './modules/insights/insights.routes', name: 'Insights' },
   { path: `${API_PREFIX}/content`, module: './modules/content/content.routes', name: 'Content' },
   { path: `${API_PREFIX}/admin`, module: './modules/admin/admin.routes', name: 'Admin' },
+  { path: `${API_PREFIX}/chats`, module: './modules/chat/chat.routes', name: 'Chats' },
+  { path: `${API_PREFIX}/notifications`, module: './modules/notifications/notification.routes', name: 'Notifications' },
 ];
 
 // ✅ SAFE LOADER (FIXED)

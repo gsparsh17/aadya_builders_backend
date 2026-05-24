@@ -4,6 +4,7 @@ const Lead = require('../leads/lead.model');
 const { AppError } = require('../../middlewares/errorHandler');
 const logger = require('../../utils/logger');
 const { clearCache } = require('../../config/redis');
+const { deleteFromCloudinary, deleteMultipleFromCloudinary } = require('../../config/cloudinary');
 const emailService = require('../../utils/emailService');
 const smsService = require('../../utils/smsService');
 const axios = require('axios');
@@ -263,9 +264,28 @@ class PropertyService {
       throw new AppError('You do not have permission to delete this property', 403, 'FORBIDDEN');
     }
 
-    // Delete associated images from S3 (async)
+    // Delete associated images from Cloudinary
     if (property.images && property.images.length > 0) {
-      // Implement S3 deletion
+      const imagePublicIds = property.images
+        .map(img => img.publicId)
+        .filter(Boolean);
+      if (imagePublicIds.length > 0) {
+        deleteMultipleFromCloudinary(imagePublicIds, 'image').catch(err =>
+          logger.error('Failed to delete images from Cloudinary:', err)
+        );
+      }
+    }
+
+    // Delete associated videos from Cloudinary
+    if (property.videos && property.videos.length > 0) {
+      const videoPublicIds = property.videos
+        .map(vid => vid.publicId)
+        .filter(Boolean);
+      if (videoPublicIds.length > 0) {
+        deleteMultipleFromCloudinary(videoPublicIds, 'video').catch(err =>
+          logger.error('Failed to delete videos from Cloudinary:', err)
+        );
+      }
     }
 
     await Property.findByIdAndDelete(propertyId);
@@ -723,6 +743,14 @@ class PropertyService {
     }
 
     const wasPrimary = property.images[imageIndex].isPrimary;
+    const deletedImage = property.images[imageIndex];
+
+    // Delete from Cloudinary if publicId exists
+    if (deletedImage.publicId) {
+      deleteFromCloudinary(deletedImage.publicId, 'image').catch(err =>
+        logger.error('Failed to delete image from Cloudinary:', err)
+      );
+    }
 
     // Remove image
     property.images.splice(imageIndex, 1);
@@ -801,6 +829,105 @@ class PropertyService {
     await property.save();
 
     return property.images;
+  }
+
+  /**
+   * Add videos to property
+   */
+  async addPropertyVideos(propertyId, userId, videos) {
+    try {
+      const property = await Property.findById(propertyId).select('owner videos');
+
+      if (!property) {
+        throw new AppError('Property not found', 404, 'PROPERTY_NOT_FOUND');
+      }
+
+      if (property.owner.toString() !== userId) {
+        throw new AppError('You do not have permission to modify this property', 403, 'FORBIDDEN');
+      }
+
+      // Check video limit
+      const currentVideoCount = property.videos?.length || 0;
+      if (currentVideoCount + videos.length > 5) {
+        throw new AppError('Maximum 5 videos allowed per property', 400, 'VIDEO_LIMIT_EXCEEDED');
+      }
+
+      // Prepare new videos
+      const newVideos = videos.map((vid, index) => ({
+        url: vid.url,
+        publicId: vid.publicId || null,
+        caption: vid.caption || '',
+        duration: vid.duration || null,
+        thumbnail: vid.thumbnail || null,
+        order: currentVideoCount + index,
+        uploadedAt: new Date()
+      }));
+
+      // Use updateOne with $push to avoid pre-save hooks
+      const result = await Property.updateOne(
+        { _id: propertyId },
+        { $push: { videos: { $each: newVideos } } }
+      );
+
+      if (result.modifiedCount === 0) {
+        throw new AppError('Failed to add videos', 500, 'UPDATE_FAILED');
+      }
+
+      // Fetch updated property to return videos
+      const updatedProperty = await Property.findById(propertyId).select('videos');
+      return updatedProperty.videos;
+
+    } catch (error) {
+      logger.error('Error in addPropertyVideos:', error);
+
+      if (error.isOperational) {
+        throw error;
+      }
+
+      throw new AppError('Failed to save videos. Please try again.', 500, 'SAVE_FAILED');
+    }
+  }
+
+  /**
+   * Delete property video
+   */
+  async deletePropertyVideo(propertyId, videoId, userId) {
+    const property = await Property.findById(propertyId);
+
+    if (!property) {
+      throw new AppError('Property not found', 404, 'PROPERTY_NOT_FOUND');
+    }
+
+    if (property.owner.toString() !== userId) {
+      throw new AppError('You do not have permission to modify this property', 403, 'FORBIDDEN');
+    }
+
+    const videoIndex = property.videos.findIndex(vid => vid._id.toString() === videoId);
+
+    if (videoIndex === -1) {
+      throw new AppError('Video not found', 404, 'VIDEO_NOT_FOUND');
+    }
+
+    const deletedVideo = property.videos[videoIndex];
+
+    // Delete from Cloudinary if publicId exists
+    if (deletedVideo.publicId) {
+      deleteFromCloudinary(deletedVideo.publicId, 'video').catch(err =>
+        logger.error('Failed to delete video from Cloudinary:', err)
+      );
+    }
+
+    // Remove video
+    property.videos.splice(videoIndex, 1);
+
+    // Reorder remaining videos
+    property.videos.forEach((vid, index) => {
+      vid.order = index;
+    });
+
+    await property.save();
+
+    return property.videos;
   }
 
   /**
