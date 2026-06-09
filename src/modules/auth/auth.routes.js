@@ -4,12 +4,6 @@ const authController = require('./auth.controller');
 const authValidation = require('./auth.validation');
 const { validate } = require('../../middlewares/validation.middleware');
 const authMiddleware = require('./auth.middleware');
-const { authLimiter } = require('../../middlewares/rateLimiter');
-
-console.log('authLimiter:', typeof authLimiter);
-console.log('validate:', typeof validate);
-console.log('authMiddleware:', typeof authMiddleware);
-
 // ==================== Public Routes ====================
 
 /**
@@ -19,7 +13,6 @@ console.log('authMiddleware:', typeof authMiddleware);
  */
 router.post(
   '/register',
-  authLimiter,
   authValidation.register,
   validate,
   authController.register
@@ -32,7 +25,6 @@ router.post(
  */
 router.post(
   '/login',
-  // authLimiter,
   authValidation.login,
   validate,
   authController.login
@@ -45,7 +37,6 @@ router.post(
  */
 router.post(
   '/login/phone',
-  authLimiter,
   authValidation.loginWithPhone,
   validate,
   authController.loginWithPhone
@@ -58,7 +49,6 @@ router.post(
  */
 router.post(
   '/social-login',
-  authLimiter,
   authValidation.socialLogin,
   validate,
   authController.socialLogin
@@ -71,7 +61,6 @@ router.post(
  */
 router.post(
   '/send-otp',
-  authLimiter,
   authValidation.sendOtp,
   validate,
   authController.sendOtp
@@ -84,7 +73,6 @@ router.post(
  */
 router.post(
   '/verify-otp',
-  authLimiter,
   authValidation.verifyOtp,
   validate,
   authController.verifyOtp
@@ -97,7 +85,6 @@ router.post(
  */
 router.post(
   '/forgot-password',
-  authLimiter,
   authValidation.forgotPassword,
   validate,
   authController.forgotPassword
@@ -110,7 +97,6 @@ router.post(
  */
 router.post(
   '/reset-password/:token',
-  authLimiter,
   authValidation.resetPassword,
   validate,
   authController.resetPassword

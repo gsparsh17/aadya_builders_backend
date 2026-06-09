@@ -10,9 +10,6 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const errorHandler = require('./middlewares/errorHandler');
 
-// ✅ FIX: use destructuring (IMPORTANT)
-const { globalLimiter } = require('./middlewares/rateLimiter');
-
 // Define API prefix
 const API_PREFIX = process.env.API_PREFIX || '/api/v1';
 
@@ -130,9 +127,6 @@ if (process.env.NODE_ENV !== 'test') {
     })
   );
 }
-
-// ================= RATE LIMIT =================
-app.use(API_PREFIX, globalLimiter);
 
 // ================= HEALTH =================
 app.get('/health', (req, res) => {

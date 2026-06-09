@@ -3,7 +3,6 @@ const router = express.Router();
 const leadController = require('./lead.controller');
 const { authMiddleware } = require('../../middlewares/auth.middleware');
 const { authorize } = require('../../middlewares/role.middleware');
-const { leadLimiter } = require('../../middlewares/rateLimiter');
 const { body, param, query } = require('express-validator');
 const { validate } = require('../../middlewares/validation.middleware');
 
@@ -19,7 +18,6 @@ router.use(authMiddleware);
  */
 router.post(
   '/',
-  leadLimiter,
   [
     body('propertyId').isMongoId().withMessage('Invalid property ID'),
     body('message').optional().isLength({ max: 500 }).withMessage('Message cannot exceed 500 characters'),
