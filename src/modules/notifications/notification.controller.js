@@ -96,6 +96,37 @@ class NotificationController {
     }
   }
 
+
+  async getUnreadCount(req, res, next) {
+    try {
+      const unreadCount = await Notification.countDocuments({ recipient: req.user._id, read: false });
+      return successResponse(res, { unreadCount }, 'Unread notification count fetched successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async markAllAsRead(req, res, next) {
+    try {
+      const result = await Notification.updateMany({ recipient: req.user._id, read: false }, { read: true });
+      return successResponse(res, { modifiedCount: result.modifiedCount || 0 }, 'All notifications marked as read');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async deleteNotification(req, res, next) {
+    try {
+      const notification = await Notification.findOneAndDelete({ _id: req.params.id, recipient: req.user._id });
+      if (!notification) {
+        return next(new AppError('Notification not found', 404));
+      }
+      return successResponse(res, null, 'Notification deleted successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
   /**
    * Mark a notification as read
    * @route PATCH /api/v1/notifications/:id/read

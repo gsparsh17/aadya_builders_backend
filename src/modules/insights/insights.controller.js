@@ -2,6 +2,7 @@ const priceTrendService = require('./priceTrend.service');
 const calculatorService = require('./calculator.service');
 const { successResponse, errorResponse } = require('../../utils/responseHandler');
 const { validationResult } = require('express-validator');
+const Property = require('../properties/property.model');
 
 /**
  * Insights Controller - Handles HTTP requests for insights and calculators
@@ -218,6 +219,58 @@ class InsightsController {
       next(error);
     }
   }
+
+  /**
+   * Get top gainers for mobile locality cards
+   * @route GET /api/v1/insights/top-gainers
+   */
+  async getTopGainers(req, res, next) {
+    try {
+      const { city, period = '1Y', limit = 10 } = req.query;
+      const match = { status: 'active' };
+      if (city) match['location.city'] = { $regex: `^${String(city).trim()}$`, $options: 'i' };
+      const rows = await Property.aggregate([
+        { $match: match },
+        { $group: {
+          _id: '$location.locality',
+          avgPricePerSqft: { $avg: '$pricePerSqft' },
+          listingsCount: { $sum: 1 }
+        } },
+        { $sort: { avgPricePerSqft: -1, listingsCount: -1 } },
+        { $limit: parseInt(limit) }
+      ]);
+      return successResponse(res, rows.filter(r => r._id).map((r, index) => ({
+        rank: index + 1,
+        locality: r._id,
+        city,
+        avgPricePerSqft: Math.round(r.avgPricePerSqft || 0),
+        appreciationPercent: 0,
+        listingsCount: r.listingsCount,
+        period
+      })), 'Top gainers retrieved successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Get calculator/tool cards for the app
+   * @route GET /api/v1/insights/tools
+   */
+  async getTools(req, res, next) {
+    try {
+      return successResponse(res, [
+        { key: 'eligibility', title: 'Check Eligibility', icon: 'check', endpoint: '/api/v1/insights/affordability' },
+        { key: 'emi', title: 'EMI Calculator', icon: 'calculator', endpoint: '/api/v1/insights/emi-calculator' },
+        { key: 'area_converter', title: 'Area Converter', icon: 'area', endpoint: '/api/v1/insights/area-converter' },
+        { key: 'stamp_duty', title: 'Stamp Duty', icon: 'document', endpoint: '/api/v1/insights/stamp-duty' },
+        { key: 'rental_yield', title: 'Rental Yield', icon: 'percent', endpoint: '/api/v1/insights/rental-yield' }
+      ], 'Popular tools retrieved successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
 }
 
 module.exports = new InsightsController();

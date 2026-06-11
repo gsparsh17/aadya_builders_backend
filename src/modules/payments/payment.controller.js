@@ -127,6 +127,23 @@ class PaymentController {
     }
   }
 
+
+  /**
+   * Get current user's subscription
+   * @route GET /api/v1/payments/my-subscription
+   */
+  async getMySubscription(req, res, next) {
+    try {
+      const User = require('../users/user.model');
+      const user = await User.findById(req.user._id)
+        .select('subscription role')
+        .populate('subscription.plan');
+      return successResponse(res, user?.subscription || null, 'Subscription retrieved successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
   /**
    * Get User Payment History
    * @route GET /api/v1/payments/history

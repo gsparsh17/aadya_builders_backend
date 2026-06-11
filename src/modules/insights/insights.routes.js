@@ -76,6 +76,9 @@ router.get(
   insightsController.getTopPerformingLocalities
 );
 
+router.get('/top-gainers', insightsController.getTopGainers);
+router.get('/tools', insightsController.getTools);
+
 // ==================== Calculators ====================
 
 /**

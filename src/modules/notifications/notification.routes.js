@@ -12,8 +12,11 @@ router.post('/broadcast', authorizeRoles('admin'), notificationController.broadc
 router.post('/recommendation', authorizeRoles('admin'), notificationController.sendPropertyRecommendation);
 
 // User routes
+router.get('/unread-count', notificationController.getUnreadCount);
+router.patch('/read-all', notificationController.markAllAsRead);
 router.get('/', notificationController.getMyNotifications);
 router.patch('/:id/read', notificationController.markAsRead);
+router.delete('/:id', notificationController.deleteNotification);
 router.post('/welcome', notificationController.sendWelcomePush);
 
 module.exports = router;

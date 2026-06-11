@@ -35,6 +35,7 @@ router.post('/verify', paymentController.verifyPayment);
  * @desc    Get user's payment transaction history
  * @access  Private
  */
+router.get('/my-subscription', paymentController.getMySubscription);
 router.get('/history', paymentController.getPaymentHistory);
 
 module.exports = router;

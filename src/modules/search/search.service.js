@@ -1,5 +1,6 @@
 const Property = require('../properties/property.model');
 const User = require('../users/user.model');
+const Project = require('../projects/project.model');
 const searchFilters = require('./search.filters');
 const { AppError } = require('../../middlewares/errorHandler');
 const logger = require('../../utils/logger');
@@ -237,27 +238,23 @@ class SearchService {
     }
     
     if (type === 'all' || type === 'project') {
-      // Project model is not yet implemented
-      /*
-      const projects = await Property.distinct('project', {
-        status: 'active'
-      });
-      
-      const Project = require('../properties/property.model').db.model('Project');
       const projectResults = await Project.find({
         name: searchRegex,
-        _id: { $in: projects }
-      }).limit(limit);
-      
+        status: { $in: ['upcoming', 'under_construction', 'ready_to_move', 'completed'] }
+      })
+        .select('name city locality')
+        .limit(limit);
+
       projectResults.forEach(project => {
         suggestions.push({
           type: 'project',
           text: project.name,
           id: project._id,
+          city: project.city,
+          locality: project.locality,
           highlight: query
         });
       });
-      */
     }
     
     if (type === 'all' || type === 'society') {

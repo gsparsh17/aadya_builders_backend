@@ -66,6 +66,25 @@ app.use(compression());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// ================= COOKIE PARSER =================
+try {
+  const cookieParser = require('cookie-parser');
+  app.use(cookieParser());
+} catch (error) {
+  app.use((req, res, next) => {
+    req.cookies = {};
+    const raw = req.headers.cookie;
+    if (raw) {
+      raw.split(';').forEach((part) => {
+        const [key, ...value] = part.trim().split('=');
+        if (key) req.cookies[key] = decodeURIComponent(value.join('='));
+      });
+    }
+    next();
+  });
+}
+
+
 // ================= CUSTOM MONGO SANITIZER =================
 // Custom middleware to sanitize NoSQL injection attempts
 // Replaces express-mongo-sanitize which has compatibility issues
@@ -170,6 +189,14 @@ const routeModules = [
   { path: `${API_PREFIX}/admin`, module: './modules/admin/admin.routes', name: 'Admin' },
   { path: `${API_PREFIX}/chats`, module: './modules/chat/chat.routes', name: 'Chats' },
   { path: `${API_PREFIX}/notifications`, module: './modules/notifications/notification.routes', name: 'Notifications' },
+  { path: `${API_PREFIX}/home`, module: './modules/home/home.routes', name: 'Home' },
+  { path: `${API_PREFIX}/projects`, module: './modules/projects/project.routes', name: 'Projects' },
+  { path: `${API_PREFIX}/builders`, module: './modules/builders/builder.routes', name: 'Builders' },
+  { path: `${API_PREFIX}/locations`, module: './modules/locations/location.routes', name: 'Locations' },
+  { path: `${API_PREFIX}/localities`, module: './modules/localities/locality.routes', name: 'Localities' },
+  { path: `${API_PREFIX}/feedback`, module: './modules/feedback/feedback.routes', name: 'Feedback' },
+  { path: `${API_PREFIX}/boost`, module: './modules/boost/boost.routes', name: 'Boost' },
+  { path: `${API_PREFIX}/shorts`, module: './modules/shorts/short.routes', name: 'Shorts' },
 ];
 
 // ✅ SAFE LOADER (FIXED)
