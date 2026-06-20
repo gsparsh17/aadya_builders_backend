@@ -190,13 +190,14 @@ class PropertyController {
         return errorResponse(res, 'Validation failed', 400, 'VALIDATION_ERROR', errors.array());
       }
 
-      const { latitude, longitude, radius = 5, limit = 20 } = req.query;
+      const { latitude, longitude, radius = 5, limit = 20, excludeId } = req.query;
 
       const properties = await propertyService.getNearbyProperties(
         parseFloat(latitude),
         parseFloat(longitude),
         parseFloat(radius),
-        parseInt(limit)
+        parseInt(limit),
+        excludeId
       );
 
       return successResponse(res, properties, 'Nearby properties retrieved successfully');

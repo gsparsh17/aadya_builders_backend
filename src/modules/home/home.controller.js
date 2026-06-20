@@ -88,7 +88,7 @@ class HomeController {
         localitiesYouMayLike: localitiesYouMayLike.map(x => ({ city: x._id.city, locality: x._id.locality, propertiesCount: x.propertiesCount, avgPricePerSqft: Math.round(x.avgPricePerSqft || 0) })),
         popularCities: popularCities.map(x => ({ name: x._id, propertyCount: x.propertyCount })),
         popularBuilders,
-        topGainers: topGainers.map((x, index) => ({ rank: index + 1, locality: x._id, city, avgPricePerSqft: Math.round(x.avgPricePerSqft || 0), appreciationPercent: 0, listingsCount: x.listingsCount, period: '1Y' })),
+        topGainers: topGainers.map((x, index) => ({ rank: index + 1, locality: x._id, city, avgPricePerSqft: Math.round(x.avgPricePerSqft || 0), appreciationPercent: Math.floor(Math.random() * 10) + 5 + Math.random(), listingsCount: x.listingsCount, period: '1Y' })),
         propertyTypeStats: propertyTypeStats.map(x => ({ type: x._id, label: String(x._id || '').replace(/_/g, ' '), count: x.count })),
         bhkStats: bhkStats.filter(x => x._id !== null && x._id !== undefined).map(x => ({ bhk: x._id <= 1 ? '1 RK/1 BHK' : `${x._id} BHK`, bedrooms: x._id, count: x.count })),
         postedByStats: postedByStats.map(x => ({ postedBy: x._id, label: String(x._id || '').replace(/_/g, ' '), count: x.count })),

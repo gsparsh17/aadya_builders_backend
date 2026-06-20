@@ -47,14 +47,13 @@ const projectSchema = new mongoose.Schema({
 projectSchema.index({ city: 1, locality: 1, status: 1 });
 projectSchema.index({ name: 'text', city: 'text', locality: 'text' });
 
-projectSchema.pre('save', function(next) {
+projectSchema.pre('save', function() {
   if (!this.slug && this.name) {
     this.slug = `${this.name}-${this.locality || this.city || ''}`
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/(^-|-$)/g, '');
   }
-  next();
 });
 
 module.exports = mongoose.model('Project', projectSchema);

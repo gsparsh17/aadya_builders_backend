@@ -2,6 +2,8 @@ const Project = require('./project.model');
 const Property = require('../properties/property.model');
 const { successResponse, paginatedResponse } = require('../../utils/responseHandler');
 const { AppError } = require('../../middlewares/errorHandler');
+const notificationService = require('../notifications/notification.service');
+const logger = require('../../utils/logger');
 
 const cityMatch = (city) => city ? { city: { $regex: `^${String(city).trim()}$`, $options: 'i' } } : {};
 const activeProjectMatch = { status: { $in: ['upcoming', 'under_construction', 'ready_to_move', 'completed'] } };
@@ -47,7 +49,7 @@ class ProjectController {
       const project = await Project.findByIdAndUpdate(
         req.params.id,
         { $inc: { views: 1 } },
-        { new: true }
+        { returnDocument: 'after' }
       ).populate('builder', 'name email phone role companyDetails reraDetails isVerified profilePicture');
       if (!project) throw new AppError('Project not found', 404, 'PROJECT_NOT_FOUND');
       return successResponse(res, project, 'Project retrieved successfully');
@@ -71,6 +73,12 @@ class ProjectController {
   async create(req, res, next) {
     try {
       const project = await Project.create({ ...req.body, builder: req.body.builder || req.user._id });
+      
+      // Trigger push notification asynchronously
+      notificationService.sendListingAlert(project, 'project').catch(err => 
+        logger.error('Failed to trigger project notification:', err)
+      );
+
       return successResponse(res, project, 'Project created successfully', 201);
     } catch (error) { next(error); }
   }
@@ -78,7 +86,7 @@ class ProjectController {
   async update(req, res, next) {
     try {
       const filter = req.user.role === 'admin' ? { _id: req.params.id } : { _id: req.params.id, builder: req.user._id };
-      const project = await Project.findOneAndUpdate(filter, req.body, { new: true, runValidators: true });
+      const project = await Project.findOneAndUpdate(filter, req.body, { returnDocument: 'after', runValidators: true });
       if (!project) throw new AppError('Project not found or access denied', 404, 'PROJECT_NOT_FOUND');
       return successResponse(res, project, 'Project updated successfully');
     } catch (error) { next(error); }
@@ -87,9 +95,49 @@ class ProjectController {
   async remove(req, res, next) {
     try {
       const filter = req.user.role === 'admin' ? { _id: req.params.id } : { _id: req.params.id, builder: req.user._id };
-      const project = await Project.findOneAndUpdate(filter, { status: 'inactive' }, { new: true });
+      const project = await Project.findOneAndUpdate(filter, { status: 'inactive' }, { returnDocument: 'after' });
       if (!project) throw new AppError('Project not found or access denied', 404, 'PROJECT_NOT_FOUND');
       return successResponse(res, null, 'Project deleted successfully');
+    } catch (error) { next(error); }
+  }
+
+  async uploadImages(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { uploadToCloudinary } = require('../../config/cloudinary');
+      const files = req.files || (req.file ? [req.file] : null);
+
+      if (!files || files.length === 0) {
+        throw new AppError('Please upload at least one image', 400, 'NO_IMAGES');
+      }
+
+      const images = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const result = await uploadToCloudinary(file.buffer, {
+          folder: 'aadya/projects/images',
+          resourceType: 'image'
+        });
+
+        images.push({
+          url: result.secure_url,
+          publicId: result.public_id,
+          caption: req.body.caption || '',
+          isPrimary: i === 0,
+          order: i
+        });
+      }
+
+      const filter = req.user.role === 'admin' ? { _id: id } : { _id: id, builder: req.user._id };
+      const project = await Project.findOneAndUpdate(
+        filter,
+        { $push: { images: { $each: images } } },
+        { returnDocument: 'after' }
+      );
+      
+      if (!project) throw new AppError('Project not found or access denied', 404, 'PROJECT_NOT_FOUND');
+
+      return successResponse(res, project.images, `${images.length} image(s) uploaded successfully`);
     } catch (error) { next(error); }
   }
 }

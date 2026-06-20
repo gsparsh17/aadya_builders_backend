@@ -7,6 +7,7 @@ const { clearCache } = require('../../config/redis');
 const { deleteFromCloudinary, deleteMultipleFromCloudinary } = require('../../config/cloudinary');
 const emailService = require('../../utils/emailService');
 const smsService = require('../../utils/smsService');
+const notificationService = require('../notifications/notification.service');
 const axios = require('axios');
 
 /**
@@ -314,6 +315,7 @@ class PropertyService {
       throw new AppError('You do not have permission to update this property', 403, 'FORBIDDEN');
     }
 
+    const previousStatus = property.status;
     property.status = status;
 
     if (status === 'sold' || status === 'rented') {
@@ -321,6 +323,14 @@ class PropertyService {
     }
 
     await property.save();
+
+    // Trigger push notification if property is newly active
+    if (previousStatus !== 'active' && status === 'active') {
+      // Async so it doesn't block the request
+      notificationService.sendListingAlert(property, 'property').catch(err => 
+        logger.error('Failed to trigger property notification:', err)
+      );
+    }
 
     // Clear cache
     await clearCache(`property:${propertyId}*`);
@@ -538,8 +548,8 @@ class PropertyService {
   /**
    * Get nearby properties
    */
-  async getNearbyProperties(latitude, longitude, radius = 5, limit = 20) {
-    const properties = await Property.find({
+  async getNearbyProperties(latitude, longitude, radius = 5, limit = 20, excludeId = null) {
+    const query = {
       status: 'active',
       'location.coordinates': {
         $near: {
@@ -550,7 +560,14 @@ class PropertyService {
           $maxDistance: radius * 1000
         }
       }
-    })
+    };
+
+    if (excludeId) {
+      // Mongoose handles casting the string to ObjectId
+      query._id = { $ne: excludeId };
+    }
+
+    const properties = await Property.find(query)
       .populate('owner', 'name profilePicture')
       .limit(limit);
 

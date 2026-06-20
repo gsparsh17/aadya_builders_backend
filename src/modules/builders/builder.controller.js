@@ -42,8 +42,8 @@ class BuilderController {
 
   async getById(req, res, next) {
     try {
-      const builder = await User.findOne({ _id: req.params.id, role: 'builder', isActive: true })
-        .select('name email phone profilePicture companyDetails reraDetails isVerified createdAt');
+      const builder = await User.findOne({ _id: req.params.id, isActive: true })
+        .select('name email phone role profilePicture companyDetails reraDetails isVerified createdAt');
       if (!builder) throw new AppError('Builder not found', 404, 'BUILDER_NOT_FOUND');
       const [totalProjects, totalProperties] = await Promise.all([
         Project.countDocuments({ builder: builder._id, status: { $ne: 'inactive' } }),

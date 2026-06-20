@@ -29,13 +29,28 @@ class ShortController {
 
   async create(req, res, next) {
     try {
+      const { uploadToCloudinary } = require('../../config/cloudinary');
+      
+      const file = req.file;
+      if (!file) {
+        throw new AppError('Please upload a video file', 400, 'NO_VIDEO');
+      }
+
       const property = await Property.findOne({ _id: req.body.property, owner: req.user._id });
       if (!property && req.user.role !== 'admin') throw new AppError('Property not found or access denied', 404, 'PROPERTY_NOT_FOUND');
+      
+      const result = await uploadToCloudinary(file.buffer, {
+        folder: 'aadya/shorts/videos',
+        resourceType: 'video'
+      });
+
+      const thumbnailUrl = result.secure_url.replace('/video/upload/', '/video/upload/w_400,h_600,c_fill,so_2/').replace(/\.[^.]+$/, '.jpg');
+
       const short = await Short.create({
         property: req.body.property,
         owner: req.user._id,
-        videoUrl: req.body.videoUrl,
-        thumbnail: req.body.thumbnail,
+        videoUrl: result.secure_url,
+        thumbnail: thumbnailUrl,
         caption: req.body.caption,
         city: property?.location?.city || req.body.city,
         locality: property?.location?.locality || req.body.locality
@@ -46,7 +61,7 @@ class ShortController {
 
   async like(req, res, next) {
     try {
-      const short = await Short.findByIdAndUpdate(req.params.id, { $addToSet: { likes: req.user._id } }, { new: true });
+      const short = await Short.findByIdAndUpdate(req.params.id, { $addToSet: { likes: req.user._id } }, { returnDocument: 'after' });
       if (!short) throw new AppError('Short not found', 404, 'SHORT_NOT_FOUND');
       return successResponse(res, { liked: true, likesCount: short.likes.length }, 'Short liked successfully');
     } catch (error) { next(error); }
@@ -54,7 +69,7 @@ class ShortController {
 
   async unlike(req, res, next) {
     try {
-      const short = await Short.findByIdAndUpdate(req.params.id, { $pull: { likes: req.user._id } }, { new: true });
+      const short = await Short.findByIdAndUpdate(req.params.id, { $pull: { likes: req.user._id } }, { returnDocument: 'after' });
       if (!short) throw new AppError('Short not found', 404, 'SHORT_NOT_FOUND');
       return successResponse(res, { liked: false, likesCount: short.likes.length }, 'Short unliked successfully');
     } catch (error) { next(error); }
@@ -62,7 +77,7 @@ class ShortController {
 
   async view(req, res, next) {
     try {
-      const short = await Short.findByIdAndUpdate(req.params.id, { $inc: { views: 1 } }, { new: true });
+      const short = await Short.findByIdAndUpdate(req.params.id, { $inc: { views: 1 } }, { returnDocument: 'after' });
       if (!short) throw new AppError('Short not found', 404, 'SHORT_NOT_FOUND');
       return successResponse(res, { views: short.views }, 'Short view recorded successfully');
     } catch (error) { next(error); }
@@ -70,7 +85,7 @@ class ShortController {
 
   async share(req, res, next) {
     try {
-      const short = await Short.findByIdAndUpdate(req.params.id, { $inc: { shares: 1 } }, { new: true });
+      const short = await Short.findByIdAndUpdate(req.params.id, { $inc: { shares: 1 } }, { returnDocument: 'after' });
       if (!short) throw new AppError('Short not found', 404, 'SHORT_NOT_FOUND');
       return successResponse(res, { shares: short.shares }, 'Short share recorded successfully');
     } catch (error) { next(error); }

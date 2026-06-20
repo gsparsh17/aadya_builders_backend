@@ -3,6 +3,7 @@ const { successResponse, paginatedResponse, errorResponse } = require('../../uti
 const { AppError } = require('../../middlewares/errorHandler');
 const logger = require('../../utils/logger');
 const { validationResult } = require('express-validator');
+const { uploadToCloudinary } = require('../../config/cloudinary');
 
 /**
  * User Controller - Handles HTTP requests for user operations
@@ -114,7 +115,12 @@ class UserController {
         throw new AppError('Please upload an image file', 400, 'NO_FILE');
       }
 
-      const user = await userService.updateProfilePicture(req.user.id, req.file.location || req.file.path);
+      const uploadResult = await uploadToCloudinary(req.file.buffer, {
+        folder: 'aadya/users/avatars',
+        transformation: [{ width: 400, height: 400, crop: 'fill' }]
+      });
+
+      const user = await userService.updateProfilePicture(req.user.id, uploadResult.url);
 
       return successResponse(res, {
         profilePicture: user.profilePicture
@@ -416,14 +422,19 @@ class UserController {
       const userId = req.user.id;
 
       const Property = require('../properties/property.model');
+      const Project = require('../projects/project.model');
       const Lead = require('../leads/lead.model');
 
-      const [stats, recentProperties, recentLeads] = await Promise.all([
+      const [stats, recentProperties, recentProjects, recentLeads] = await Promise.all([
         userService.getUserStats(userId),
         Property.find({ owner: userId })
           .sort({ createdAt: -1 })
           .limit(5)
           .select('title price purpose status views leads createdAt primaryImage'),
+        Project.find({ builder: userId })
+          .sort({ createdAt: -1 })
+          .limit(5)
+          .select('name status views searches createdAt configurations priceRange images'),
         Lead.find({
           $or: [
             { owner: userId },
@@ -439,6 +450,7 @@ class UserController {
       return successResponse(res, {
         stats,
         recentProperties,
+        recentProjects,
         recentLeads
       }, 'Dashboard data retrieved successfully');
     } catch (error) {

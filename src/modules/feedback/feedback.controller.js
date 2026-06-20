@@ -2,6 +2,20 @@ const Feedback = require('./feedback.model');
 const { successResponse } = require('../../utils/responseHandler');
 
 class FeedbackController {
+  async submitGeneralFeedback(req, res, next) {
+    try {
+      const feedback = await Feedback.create({
+        user: req.user?._id,
+        type: req.body.type || 'general',
+        comment: req.body.message,
+        metadata: {
+          subject: req.body.subject,
+          property: req.body.property
+        }
+      });
+      return successResponse(res, feedback, 'Feedback submitted successfully', 201);
+    } catch (error) { next(error); }
+  }
   async helpful(req, res, next) {
     try {
       const feedback = await Feedback.create({

@@ -140,9 +140,14 @@ class PriceTrendService {
   /**
    * Get market overview
    */
-  async getMarketOverview() {
+  async getMarketOverview(city) {
+    const match = { status: 'active' };
+    if (city) {
+      match['location.city'] = { $regex: `^${String(city).trim()}$`, $options: 'i' };
+    }
+
     const overview = await Property.aggregate([
-      { $match: { status: 'active' } },
+      { $match: match },
       {
         $facet: {
           overall: [

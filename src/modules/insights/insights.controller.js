@@ -56,7 +56,8 @@ class InsightsController {
    */
   async getMarketOverview(req, res, next) {
     try {
-      const overview = await priceTrendService.getMarketOverview();
+      const { city } = req.query;
+      const overview = await priceTrendService.getMarketOverview(city);
       
       return successResponse(res, overview, 'Market overview retrieved successfully');
     } catch (error) {
