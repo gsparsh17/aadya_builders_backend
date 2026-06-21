@@ -15,7 +15,7 @@ class OneSignalService {
    * @param {String} message - Notification body
    * @param {Object} additionalData - Custom JSON data to send with notification
    */
-  async sendPushNotification(userIds, title, message, additionalData = {}) {
+  async sendPushNotification(userIds, title, message, additionalData = {}, imageUrl = null) {
     if (!this.appId || !this.apiKey) {
       logger.warn('OneSignal credentials not configured. Skipping push notification.');
       return;
@@ -34,6 +34,11 @@ class OneSignalService {
         contents: { en: message },
         data: additionalData,
       };
+
+      if (imageUrl) {
+        payload.big_picture = imageUrl; // for Android
+        payload.ios_attachments = { "id1": imageUrl }; // for iOS
+      }
 
       const response = await axios.post(this.baseUrl, payload, {
         headers: {

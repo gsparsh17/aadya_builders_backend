@@ -17,7 +17,7 @@ const notificationSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['welcome', 'chat', 'recommendation', 'system'],
+    enum: ['welcome', 'chat', 'recommendation', 'project_recommendation', 'system'],
     default: 'system'
   },
   read: {
@@ -31,6 +31,10 @@ const notificationSchema = new mongoose.Schema({
   data: {
     type: mongoose.Schema.Types.Mixed, // For any extra JSON payload
     default: {}
+  },
+  isDeleted: {
+    type: Boolean,
+    default: false
   }
 }, {
   timestamps: true
@@ -38,5 +42,8 @@ const notificationSchema = new mongoose.Schema({
 
 // Index to quickly fetch a user's notifications sorted by newest first
 notificationSchema.index({ recipient: 1, createdAt: -1 });
+
+// Compound index to quickly check if a user already received a notification for a specific item
+notificationSchema.index({ recipient: 1, relatedId: 1 });
 
 module.exports = mongoose.model('Notification', notificationSchema);

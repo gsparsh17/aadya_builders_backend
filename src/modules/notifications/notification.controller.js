@@ -2,6 +2,7 @@ const oneSignalService = require('../../utils/onesignal.service');
 const { successResponse } = require('../../utils/responseHandler');
 const { AppError } = require('../../middlewares/errorHandler');
 const Notification = require('./notification.model');
+const notificationService = require('./notification.service');
 
 class NotificationController {
   /**
@@ -74,13 +75,16 @@ class NotificationController {
       const limit = parseInt(req.query.limit) || 20;
       const skip = (page - 1) * limit;
 
-      const notifications = await Notification.find({ recipient: req.user._id })
+      // Generate matching city notifications for the user on app launch / notifications check
+      await notificationService.generateCityNotifications(req.user._id, req.query.city);
+
+      const notifications = await Notification.find({ recipient: req.user._id, isDeleted: { $ne: true } })
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit);
 
-      const total = await Notification.countDocuments({ recipient: req.user._id });
-      const unreadCount = await Notification.countDocuments({ recipient: req.user._id, read: false });
+      const total = await Notification.countDocuments({ recipient: req.user._id, isDeleted: { $ne: true } });
+      const unreadCount = await Notification.countDocuments({ recipient: req.user._id, read: false, isDeleted: { $ne: true } });
 
       return successResponse(res, {
         notifications,
@@ -99,7 +103,7 @@ class NotificationController {
 
   async getUnreadCount(req, res, next) {
     try {
-      const unreadCount = await Notification.countDocuments({ recipient: req.user._id, read: false });
+      const unreadCount = await Notification.countDocuments({ recipient: req.user._id, read: false, isDeleted: { $ne: true } });
       return successResponse(res, { unreadCount }, 'Unread notification count fetched successfully');
     } catch (error) {
       next(error);
@@ -108,7 +112,7 @@ class NotificationController {
 
   async markAllAsRead(req, res, next) {
     try {
-      const result = await Notification.updateMany({ recipient: req.user._id, read: false }, { read: true });
+      const result = await Notification.updateMany({ recipient: req.user._id, read: false, isDeleted: { $ne: true } }, { read: true });
       return successResponse(res, { modifiedCount: result.modifiedCount || 0 }, 'All notifications marked as read');
     } catch (error) {
       next(error);
@@ -117,7 +121,7 @@ class NotificationController {
 
   async deleteNotification(req, res, next) {
     try {
-      const notification = await Notification.findOneAndDelete({ _id: req.params.id, recipient: req.user._id });
+      const notification = await Notification.findOneAndUpdate({ _id: req.params.id, recipient: req.user._id }, { isDeleted: true }, { new: true });
       if (!notification) {
         return next(new AppError('Notification not found', 404));
       }
