@@ -85,8 +85,10 @@ class ProjectController {
 
   async update(req, res, next) {
     try {
+      console.log('Project Update req.body:', JSON.stringify(req.body));
       const filter = req.user.role === 'admin' ? { _id: req.params.id } : { _id: req.params.id, builder: req.user._id };
       const project = await Project.findOneAndUpdate(filter, req.body, { returnDocument: 'after', runValidators: true });
+      console.log('Updated Project in DB:', JSON.stringify(project?.coordinates));
       if (!project) throw new AppError('Project not found or access denied', 404, 'PROJECT_NOT_FOUND');
       return successResponse(res, project, 'Project updated successfully');
     } catch (error) { next(error); }

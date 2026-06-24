@@ -7,6 +7,17 @@ const projectSchema = new mongoose.Schema({
   city: { type: String, required: true, trim: true, index: true },
   locality: { type: String, required: true, trim: true, index: true },
   address: { type: String, trim: true },
+  coordinates: {
+    type: {
+      type: String,
+      enum: ['Point'],
+      default: 'Point'
+    },
+    coordinates: {
+      type: [Number], // [longitude, latitude]
+      index: '2dsphere'
+    }
+  },
   description: { type: String, trim: true },
   priceRange: {
     min: { type: Number, default: 0 },
