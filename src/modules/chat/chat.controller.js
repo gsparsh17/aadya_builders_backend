@@ -72,13 +72,39 @@ exports.getChats = async (req, res, next) => {
   try {
     const userId = req.user._id;
 
-    const chats = await Chat.find({
+    let chats = await Chat.find({
       $or: [{ buyer: userId }, { owner: userId }]
     })
-    .populate('property', 'title images price location.city location.locality')
     .populate('buyer', 'name profilePicture')
     .populate('owner', 'name profilePicture')
-    .sort('-lastMessageAt');
+    .sort('-lastMessageAt')
+    .lean();
+
+    const Project = require('../projects/project.model');
+    const Property = require('../properties/property.model');
+
+    for (let i = 0; i < chats.length; i++) {
+      let chat = chats[i];
+      if (chat.property) {
+        let propId = chat.property;
+        let prop = await Property.findById(propId).select('title images price location.city location.locality').lean();
+        
+        if (!prop) {
+          let proj = await Project.findById(propId).select('name images priceRange city locality').lean();
+          if (proj) {
+            prop = {
+              _id: proj._id,
+              id: proj._id,
+              title: proj.name,
+              price: proj.priceRange?.min || 0,
+              images: proj.images,
+              location: { city: proj.city, locality: proj.locality }
+            };
+          }
+        }
+        chat.property = prop || { _id: propId }; // preserve ID even if both fail
+      }
+    }
 
     return successResponse(res, { chats }, 'Chats retrieved successfully', 200);
   } catch (error) {

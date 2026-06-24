@@ -18,19 +18,35 @@ class LeadService {
     const { message, contactPreference, preferredTimeToContact } = leadData;
     
     // Get property with owner details
-    const property = await Property.findById(propertyId).populate('owner', 'name email phone');
+    let property = await Property.findById(propertyId).populate('owner', 'name email phone');
+    let isProject = false;
     
     if (!property) {
-      throw new AppError('Property not found', 404, 'PROPERTY_NOT_FOUND');
+      // Fallback: Check if it's a Project instead
+      const Project = require('../projects/project.model');
+      property = await Project.findById(propertyId).populate('builder', 'name email phone');
+      isProject = !!property;
     }
     
-    // Check if property is active
-    if (property.status !== 'active') {
-      throw new AppError('This property is no longer available', 400, 'PROPERTY_NOT_ACTIVE');
+    if (!property) {
+      throw new AppError('Property or Project not found', 404, 'PROPERTY_NOT_FOUND');
     }
+    
+    // Check if property is active based on whether it's a Property or a Project
+    if (isProject) {
+      if (property.status === 'inactive') {
+        throw new AppError('This project is no longer available', 400, 'PROJECT_NOT_ACTIVE');
+      }
+    } else {
+      if (property.status !== 'active' && property.status !== 'under_construction' && property.status !== 'new_launch') {
+        throw new AppError('This property is no longer available', 400, 'PROPERTY_NOT_ACTIVE');
+      }
+    }
+    
+    const ownerId = isProject ? property.builder._id : property.owner._id;
     
     // Check if buyer is the owner
-    if (property.owner._id.toString() === buyerId) {
+    if (ownerId.toString() === buyerId) {
       throw new AppError('You cannot contact yourself', 400, 'SELF_CONTACT');
     }
     
@@ -46,7 +62,7 @@ class LeadService {
     }
     
     // Get buyer details
-    const buyer = await User.findById(buyerId).select('name email phone');
+    const buyer = await User.findById(buyerId).select('name email phone profilePicture');
     
     if (!buyer) {
       throw new AppError('Buyer not found', 404, 'BUYER_NOT_FOUND');
@@ -56,7 +72,7 @@ class LeadService {
     const lead = await Lead.create({
       property: propertyId,
       buyer: buyerId,
-      owner: property.owner._id,
+      owner: ownerId,
       message: message || 'Interested in this property',
       contactPreference: contactPreference || 'any',
       preferredTimeToContact: preferredTimeToContact || 'anytime',
@@ -67,14 +83,16 @@ class LeadService {
         profilePicture: buyer.profilePicture
       },
       propertySnapshot: {
-        title: property.title,
-        price: property.price,
-        purpose: property.purpose,
+        title: isProject ? property.name : property.title,
+        price: isProject ? (property.priceRange?.min || 0) : property.price,
+        purpose: isProject ? 'new_launch' : property.purpose,
         location: {
-          locality: property.location.locality,
-          city: property.location.city
+          locality: isProject ? property.locality : property.location?.locality,
+          city: isProject ? property.city : property.location?.city
         },
-        primaryImage: property.primaryImage
+        primaryImage: isProject 
+            ? (property.images && property.images.length > 0 ? (property.images.find(img => img.isPrimary)?.url || property.images[0].url) : null)
+            : property.primaryImage
       }
     });
     
@@ -84,12 +102,36 @@ class LeadService {
     );
     
     // Increment property lead count
-    await Property.findByIdAndUpdate(propertyId, { $inc: { leads: 1 } });
+    if (isProject) {
+      const Project = require('../projects/project.model');
+      await Project.findByIdAndUpdate(propertyId, { $inc: { leads: 1 } });
+    } else {
+      await Property.findByIdAndUpdate(propertyId, { $inc: { leads: 1 } });
+    }
     
     // Send notifications to owner
-    this.sendLeadNotifications(property.owner, buyer, property, message).catch(err =>
+    const ownerObj = isProject ? property.builder : property.owner;
+    this.sendLeadNotifications(ownerObj, buyer, property, message).catch(err =>
       logger.error('Failed to send lead notifications:', err)
     );
+    
+    // Automatically send a Chat message
+    try {
+      const Chat = require('../chat/chat.model');
+      let chat = await Chat.findOne({ property: propertyId, buyer: buyerId, owner: ownerId });
+      if (!chat) {
+        chat = await Chat.create({ property: propertyId, buyer: buyerId, owner: ownerId, messages: [] });
+      }
+      chat.messages.push({
+        sender: buyerId,
+        content: message || 'Interested in this property',
+        isRead: false
+      });
+      chat.lastMessageAt = Date.now();
+      await chat.save();
+    } catch (chatErr) {
+      logger.error('Failed to create chat message for lead:', chatErr);
+    }
     
     return lead;
   }
