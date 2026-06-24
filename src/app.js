@@ -197,6 +197,7 @@ const routeModules = [
   { path: `${API_PREFIX}/feedback`, module: './modules/feedback/feedback.routes', name: 'Feedback' },
   { path: `${API_PREFIX}/boost`, module: './modules/boost/boost.routes', name: 'Boost' },
   { path: `${API_PREFIX}/shorts`, module: './modules/shorts/short.routes', name: 'Shorts' },
+  { path: `${API_PREFIX}/layouts`, module: './modules/layouts/layout.routes', name: 'Layouts' },
 ];
 
 // ✅ SAFE LOADER (FIXED)

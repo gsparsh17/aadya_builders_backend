@@ -27,6 +27,32 @@ const startServer = async () => {
       logger.info(`API available at http://localhost:${PORT}${process.env.API_PREFIX}`);
     });
 
+    // Initialize Socket.io
+    const socketIo = require('socket.io');
+    const io = socketIo(server, {
+      cors: {
+        origin: [
+          process.env.FRONTEND_URL,
+          process.env.ADMIN_URL,
+          'http://localhost:3000',
+          'http://localhost:3001',
+          'http://localhost:5173',
+        ].filter(Boolean),
+        credentials: true
+      }
+    });
+
+    io.on('connection', (socket) => {
+      logger.info(`Client connected: ${socket.id}`);
+      
+      socket.on('disconnect', () => {
+        logger.info(`Client disconnected: ${socket.id}`);
+      });
+    });
+
+    // Make io accessible globally
+    app.set('io', io);
+
     // Handle unhandled promise rejections
     process.on('unhandledRejection', (err) => {
       logger.error('UNHANDLED REJECTION! Shutting down...');

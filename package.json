@@ -371,6 +371,7 @@
     "simple-update-notifier": "^2.0.0",
     "slash": "^3.0.0",
     "slugify": "^1.6.9",
+    "socket.io": "^4.8.3",
     "source-map": "^0.6.1",
     "source-map-support": "^0.5.13",
     "sparse-bitfield": "^3.0.3",
