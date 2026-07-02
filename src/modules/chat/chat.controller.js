@@ -152,11 +152,11 @@ exports.sendMessage = async (req, res, next) => {
     const receiverId = isBuyer ? chat.owner.toString() : chat.buyer.toString();
 
     // Trigger Push Notification
-    const pushMessage = `New message from ${req.user.name.split(' ')[0]}`;
+    const senderName = req.user.name.split(' ')[0];
     oneSignalService.sendPushNotification(
       [receiverId.toString()],
-      "Aadya Acres Chat",
-      pushMessage,
+      senderName,
+      content,
       { type: 'chat', chatId: chat._id.toString() }
     ).catch(err => console.error('Push notification failed:', err));
 
@@ -164,8 +164,8 @@ exports.sendMessage = async (req, res, next) => {
     const Notification = require('../notifications/notification.model');
     Notification.create({
       recipient: receiverId,
-      title: "New Message",
-      message: pushMessage,
+      title: senderName,
+      message: content,
       type: 'chat',
       relatedId: chat._id
     }).catch(err => console.error('Notification DB save failed:', err));
