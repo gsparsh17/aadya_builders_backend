@@ -425,7 +425,7 @@ class UserController {
       const Project = require('../projects/project.model');
       const Lead = require('../leads/lead.model');
 
-      const [stats, recentProperties, recentProjects, recentLeads] = await Promise.all([
+      const [stats, recentProperties, recentProjects, rawLeads] = await Promise.all([
         userService.getUserStats(userId),
         Property.find({ owner: userId })
           .sort({ createdAt: -1 })
@@ -443,9 +443,30 @@ class UserController {
         })
           .sort({ createdAt: -1 })
           .limit(5)
-          .populate('property', 'title primaryImage')
           .populate('buyer', 'name')
+          .lean()
       ]);
+
+      const recentLeads = await Promise.all(rawLeads.map(async (lead) => {
+        if (lead.property) {
+          let prop = await Property.findById(lead.property).select('title images').lean();
+          if (prop) {
+            prop.primaryImage = prop.images && prop.images.length > 0 ? (prop.images[0].url || prop.images[0]) : null;
+            delete prop.images;
+          } else {
+            let proj = await Project.findById(lead.property).select('name images').lean();
+            if (proj) {
+              prop = {
+                _id: proj._id,
+                title: proj.name,
+                primaryImage: proj.images && proj.images.length > 0 ? (proj.images[0].url || proj.images[0]) : null
+              };
+            }
+          }
+          lead.property = prop || { _id: lead.property };
+        }
+        return lead;
+      }));
 
       return successResponse(res, {
         stats,
