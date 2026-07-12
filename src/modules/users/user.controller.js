@@ -430,7 +430,7 @@ class UserController {
         Property.find({ owner: userId })
           .sort({ createdAt: -1 })
           .limit(5)
-          .select('title price purpose status views leads createdAt primaryImage'),
+          .select('title price purpose status views leads createdAt primaryImage images'),
         Project.find({ builder: userId })
           .sort({ createdAt: -1 })
           .limit(5)
