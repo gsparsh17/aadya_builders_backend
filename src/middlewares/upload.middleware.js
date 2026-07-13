@@ -76,8 +76,24 @@ const uploadMedia = multer({
   },
 });
 
+/**
+ * File filter to accept any file (audio, pdf, doc, image, etc.)
+ */
+const anyFileFilter = (req, file, cb) => {
+  cb(null, true); // accept everything, or restrict to specific types if needed
+};
+
+const uploadAny = multer({
+  storage,
+  fileFilter: anyFileFilter,
+  limits: {
+    fileSize: 50 * 1024 * 1024, // 50 MB
+  }
+});
+
 module.exports = {
   uploadImages,
   uploadVideos,
-  uploadMedia
+  uploadMedia,
+  uploadAny
 };

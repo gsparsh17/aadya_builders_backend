@@ -11,6 +11,10 @@ router.use(authMiddleware);
 // Get all chats for the user
 router.get('/', chatController.getChats);
 
+// Upload media for chat messages
+const { uploadAny } = require('../../middlewares/upload.middleware');
+router.post('/upload', uploadAny.single('file'), chatController.uploadMedia);
+
 // Initiate a chat
 router.post('/initiate',
   [

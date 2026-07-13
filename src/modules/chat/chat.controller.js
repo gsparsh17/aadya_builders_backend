@@ -42,8 +42,8 @@ exports.initiateChat = async (req, res, next) => {
       buyer: buyerId,
       owner: ownerId
     }).populate('property', 'title images price location.city location.locality')
-      .populate('buyer', 'name profilePicture')
-      .populate('owner', 'name profilePicture');
+      .populate('buyer', 'name profilePicture phone')
+      .populate('owner', 'name profilePicture phone');
 
     if (!chat) {
       chat = await Chat.create({
@@ -54,8 +54,8 @@ exports.initiateChat = async (req, res, next) => {
       });
       chat = await chat.populate([
         { path: 'property', select: 'title images price location.city location.locality' },
-        { path: 'buyer', select: 'name profilePicture' },
-        { path: 'owner', select: 'name profilePicture' }
+        { path: 'buyer', select: 'name profilePicture phone' },
+        { path: 'owner', select: 'name profilePicture phone' }
       ]);
     }
 
@@ -75,8 +75,8 @@ exports.getChats = async (req, res, next) => {
     let chats = await Chat.find({
       $or: [{ buyer: userId }, { owner: userId }]
     })
-    .populate('buyer', 'name profilePicture')
-    .populate('owner', 'name profilePicture')
+    .populate('buyer', 'name profilePicture phone')
+    .populate('owner', 'name profilePicture phone')
     .sort('-lastMessageAt')
     .lean();
 
@@ -118,11 +118,11 @@ exports.getChats = async (req, res, next) => {
 exports.sendMessage = async (req, res, next) => {
   try {
     const { chatId } = req.params;
-    const { content } = req.body;
+    const { content, type = 'text', mediaUrl } = req.body;
     const senderId = req.user._id;
 
-    if (!content) {
-      return next(new AppError('Message content is required', 400));
+    if (!content && !mediaUrl) {
+      return next(new AppError('Message content or media is required', 400));
     }
 
     const chat = await Chat.findById(chatId);
@@ -140,7 +140,9 @@ exports.sendMessage = async (req, res, next) => {
 
     const newMessage = {
       sender: senderId,
-      content,
+      content: content || '',
+      type,
+      mediaUrl,
       isRead: false
     };
 
@@ -215,6 +217,29 @@ exports.getMessages = async (req, res, next) => {
     return successResponse(res, { 
       messages: chat.messages 
     }, 'Messages retrieved successfully', 200);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Upload media for chat
+ */
+exports.uploadMedia = async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return next(new AppError('No file provided', 400));
+    }
+
+    const { uploadToCloudinary } = require('../../config/cloudinary');
+    const result = await uploadToCloudinary(req.file.buffer, {
+      folder: 'aadya/chat',
+      resource_type: 'auto'
+    });
+
+    return successResponse(res, {
+      mediaUrl: result.secure_url
+    }, 'File uploaded successfully', 200);
   } catch (error) {
     next(error);
   }
