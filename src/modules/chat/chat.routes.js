@@ -37,7 +37,14 @@ router.get('/:chatId/messages',
 router.post('/:chatId/messages',
   [
     param('chatId').isMongoId().withMessage('Invalid chat ID'),
-    body('content').notEmpty().withMessage('Message content is required'),
+    body('content').optional({ nullable: true, checkFalsy: false }),
+    body('mediaUrl').optional({ nullable: true }),
+    body().custom((_, { req }) => {
+      if (!req.body.content && !req.body.mediaUrl) {
+        throw new Error('Message content or media URL is required');
+      }
+      return true;
+    }),
     validate
   ],
   chatController.sendMessage
