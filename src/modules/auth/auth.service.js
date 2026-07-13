@@ -137,8 +137,10 @@ class AuthService {
    * Login with email and password
    */
   async login(email, password, ipAddress, userAgent, rememberMe = false) {
-    // Find user with password field
-    const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
+    // Find user with password field and populate subscription plan
+    const user = await User.findOne({ email: email.toLowerCase() })
+      .select('+password')
+      .populate('subscription.plan');
     
     if (!user) {
       await this.logLoginAttempt(null, ipAddress, userAgent, 'failed', 'login', 'User not found');
@@ -196,7 +198,8 @@ class AuthService {
         isVerified: user.isVerified,
         emailVerified: user.emailVerified,
         phoneVerified: user.phoneVerified,
-        preferences: user.preferences
+        preferences: user.preferences,
+        subscription: user.subscription
       },
       tokens
     };
@@ -210,7 +213,7 @@ class AuthService {
     await this.verifyOtp(phone, otp, 'login');
     
     // Find user
-    const user = await User.findOne({ phone });
+    const user = await User.findOne({ phone }).populate('subscription.plan');
     
     if (!user) {
       await this.logLoginAttempt(null, ipAddress, userAgent, 'failed', 'phone_login', 'User not found');
@@ -242,7 +245,8 @@ class AuthService {
         role: user.role,
         profilePicture: user.profilePicture,
         isVerified: user.isVerified,
-        phoneVerified: true
+        phoneVerified: true,
+        subscription: user.subscription
       },
       tokens
     };
@@ -549,7 +553,7 @@ class AuthService {
     }
     
     // Find or create user
-    let user = await User.findOne({ email: email.toLowerCase() });
+    let user = await User.findOne({ email: email.toLowerCase() }).populate('subscription.plan');
     
     if (!user) {
       // Create new user
@@ -580,9 +584,11 @@ class AuthService {
         id: user._id,
         name: user.name,
         email: user.email,
+        phone: user.phone,
         role: user.role,
         profilePicture: user.profilePicture,
-        isVerified: user.isVerified
+        isVerified: user.isVerified,
+        subscription: user.subscription
       },
       tokens
     };
