@@ -288,17 +288,22 @@ userSchema.methods.generatePhoneOtp = function() {
 };
 
 userSchema.methods.hasActiveSubscription = function() {
+  const isUnlimited = this.subscription?.listingsRemaining === -1;
+  const hasRemaining = this.subscription?.listingsRemaining > 0;
+  
   return this.subscription?.isActive && 
          this.subscription?.endDate > new Date() &&
-         this.subscription?.listingsRemaining > 0;
+         (isUnlimited || hasRemaining);
 };
 
 userSchema.methods.canPostProperty = function() {
   if (this.role === 'admin' || this.role === 'builder') return true;
   
-  if (this.role === 'owner') {
-    return this.subscription?.listingsRemaining > 0 || 
-           (this.subscription?.listingsPosted || 0) < 3;
+  if (this.role === 'owner' || this.role === 'buyer') {
+    const isUnlimited = this.subscription?.listingsRemaining === -1;
+    const hasRemaining = this.subscription?.listingsRemaining > 0;
+    
+    return isUnlimited || hasRemaining || (this.subscription?.listingsPosted || 0) < 3;
   }
   
   return this.hasActiveSubscription();

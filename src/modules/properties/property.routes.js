@@ -37,7 +37,7 @@ router.get('/:id', optionalAuth, propertyValidation.getById, validate, propertyC
 
 // ==================== Protected Routes ====================
 
-router.post('/', authMiddleware, authorize('owner', 'dealer', 'builder', 'admin'), propertyValidation.create, validate, propertyController.createProperty);
+router.post('/', authMiddleware, authorize('owner', 'dealer', 'builder', 'admin', 'buyer'), propertyValidation.create, validate, propertyController.createProperty);
 router.put('/:id', authMiddleware, propertyValidation.update, validate, propertyController.updateProperty);
 router.post('/:id/boost', authMiddleware, boostController.boostProperty);
 router.delete('/:id', authMiddleware, propertyController.deleteProperty);
