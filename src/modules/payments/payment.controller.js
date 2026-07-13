@@ -109,16 +109,22 @@ class PaymentController {
         'featured_only': 'featured'
       };
 
+      const updateData = {
+        'subscription.plan': plan._id,
+        'subscription.planName': plan.name,
+        'subscription.startDate': startDate,
+        'subscription.endDate': endDate,
+        'subscription.listingsRemaining': plan.listingLimit,
+        'subscription.isActive': true,
+        'subscription.planType': planTypeMap[plan.type] || 'premium'
+      };
+
+      if (plan.type && plan.type !== 'featured_only') {
+        updateData.role = plan.type;
+      }
+
       await User.findByIdAndUpdate(userId, {
-        $set: {
-          'subscription.plan': plan._id,
-          'subscription.planName': plan.name,
-          'subscription.startDate': startDate,
-          'subscription.endDate': endDate,
-          'subscription.listingsRemaining': plan.listingLimit,
-          'subscription.isActive': true,
-          'subscription.planType': planTypeMap[plan.type] || 'premium'
-        }
+        $set: updateData
       });
 
       return successResponse(res, { success: true }, 'Payment verified and subscription activated');
