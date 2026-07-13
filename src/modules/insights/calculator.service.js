@@ -159,6 +159,7 @@ class CalculatorService {
     const toSqftRates = {
       sqft: 1,
       sqyrd: 9,
+      sqyd: 9,
       sqm: 10.7639,
       acre: 43560,
       hectare: 107639,
@@ -193,10 +194,12 @@ class CalculatorService {
       karnataka: { male: 5, female: 5 },
       delhi: { male: 6, female: 4 },
       tamilnadu: { male: 7, female: 7 },
+      'tamil nadu': { male: 7, female: 7 },
       telangana: { male: 5, female: 5 },
       gujarat: { male: 4.9, female: 4.9 },
       westbengal: { male: 7, female: 5 },
       uttarpradesh: { male: 7, female: 6 },
+      up: { male: 7, female: 6 },
       haryana: { male: 7, female: 5 },
       default: { male: 6, female: 5 }
     };
