@@ -156,6 +156,40 @@ class AuthController {
   }
 
   /**
+   * Login with phone and password (no OTP)
+   * @route POST /api/v1/auth/login/phone-password
+   */
+  async loginWithPhonePassword(req, res, next) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return errorResponse(res, 'Validation failed', 400, 'VALIDATION_ERROR', errors.array());
+      }
+
+      const { phone, password } = req.body;
+      const ipAddress = req.ip || req.connection.remoteAddress;
+      const userAgent = req.headers['user-agent'];
+
+      const result = await authService.loginWithPhonePassword(phone, password, ipAddress, userAgent);
+
+      res.cookie('refreshToken', result.tokens.refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000
+      });
+
+      return successResponse(res, {
+        user: result.user,
+        accessToken: result.tokens.accessToken,
+        refreshToken: result.tokens.refreshToken
+      }, 'Login successful');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * Social login (Google, Facebook, Apple)
    * @route POST /api/v1/auth/social-login
    */

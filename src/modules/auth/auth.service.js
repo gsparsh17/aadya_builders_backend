@@ -54,32 +54,34 @@ class AuthService {
    * Register new user
    */
   async register(userData, ipAddress, userAgent) {
-    const { name, email, phone, password, role = 'buyer' } = userData;
+    const { name, phone, password, role = 'buyer' } = userData;
+    // Email is optional — generate a placeholder if not provided
+    const email = (userData.email && userData.email.trim())
+      ? userData.email.trim().toLowerCase()
+      : `${phone}@aadyaacres.com`;
     
-    // Check if user already exists
-    const existingUser = await User.findOne({
-      $or: [
-        { email: email.toLowerCase() },
-        { phone: phone }
-      ]
-    });
-    
-    if (existingUser) {
-      if (existingUser.email === email.toLowerCase()) {
+    // Check if user already exists by phone
+    const existingByPhone = await User.findOne({ phone });
+    if (existingByPhone) {
+      throw new AppError('Phone number already registered', 409, 'PHONE_EXISTS');
+    }
+
+    // Check email only if a real email was provided
+    if (userData.email && userData.email.trim()) {
+      const existingByEmail = await User.findOne({ email });
+      if (existingByEmail) {
         throw new AppError('Email already registered', 409, 'EMAIL_EXISTS');
-      }
-      if (existingUser.phone === phone) {
-        throw new AppError('Phone number already registered', 409, 'PHONE_EXISTS');
       }
     }
     
     // Create user
     const user = await User.create({
       name,
-      email: email.toLowerCase(),
+      email,
       phone,
       password,
       role,
+      phoneVerified: true, // Phone was verified via OTP before reaching register
       subscription: {
         listingsRemaining: role === 'owner' ? 3 : 0,
         isActive: false
@@ -288,13 +290,20 @@ class AuthService {
       expiresAt: new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
     });
     
-    // Send OTP via SMS (async)
-    // smsService.sendOtp(phone, otp)
-      // .catch(err => logger.error('Failed to send OTP SMS:', err));
+    // Send OTP via 2Factor SMS
+    try {
+      await smsService.sendOtp(phone, otp);
+    } catch (smsErr) {
+      logger.error('Failed to send OTP SMS:', smsErr);
+      // In development, fall through and return OTP for testing even if SMS fails
+      if (process.env.NODE_ENV !== 'development') {
+        throw new AppError('Failed to send OTP. Please try again.', 503, 'SMS_FAILED');
+      }
+    }
     
-    // In development, return OTP for testing
+    // In development, also return OTP in response for easy testing
     if (process.env.NODE_ENV === 'development') {
-      return { otp, expiresIn: 600 };
+      return { otp, expiresIn: 600, message: 'OTP sent via SMS (dev: OTP shown here)' };
     }
     
     return { message: 'OTP sent successfully', expiresIn: 600 };
@@ -327,6 +336,61 @@ class AuthService {
     await OTP.deleteOne({ _id: otpRecord._id });
     
     return true;
+  }
+
+  /**
+   * Login with phone number and password (no OTP)
+   */
+  async loginWithPhonePassword(phone, password, ipAddress, userAgent) {
+    // Find user by phone with password field
+    const user = await User.findOne({ phone })
+      .select('+password')
+      .populate('subscription.plan');
+
+    if (!user) {
+      await this.logLoginAttempt(null, ipAddress, userAgent, 'failed', 'phone_password_login', 'User not found');
+      throw new AppError('No account found with this phone number', 404, 'USER_NOT_FOUND');
+    }
+
+    if (!user.isActive) {
+      await this.logLoginAttempt(user._id, ipAddress, userAgent, 'failed', 'phone_password_login', 'Account deactivated');
+      throw new AppError('Your account has been deactivated. Please contact support.', 403, 'ACCOUNT_DEACTIVATED');
+    }
+
+    if (user.isBlocked) {
+      await this.logLoginAttempt(user._id, ipAddress, userAgent, 'failed', 'phone_password_login', 'Account blocked');
+      throw new AppError('Your account has been blocked. Please contact support.', 403, 'ACCOUNT_BLOCKED');
+    }
+
+    const isPasswordValid = await user.comparePassword(password);
+    if (!isPasswordValid) {
+      await this.logLoginAttempt(user._id, ipAddress, userAgent, 'failed', 'phone_password_login', 'Invalid password');
+      throw new AppError('Invalid phone number or password', 401, 'INVALID_CREDENTIALS');
+    }
+
+    user.lastLogin = new Date();
+    user.loginCount = (user.loginCount || 0) + 1;
+    await user.save({ validateBeforeSave: false });
+
+    await this.logLoginAttempt(user._id, ipAddress, userAgent, 'success', 'phone_password_login');
+
+    const tokens = this.generateTokens(user);
+
+    return {
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        profilePicture: user.profilePicture,
+        isVerified: user.isVerified,
+        phoneVerified: user.phoneVerified,
+        preferences: user.preferences,
+        subscription: user.subscription
+      },
+      tokens
+    };
   }
 
   /**

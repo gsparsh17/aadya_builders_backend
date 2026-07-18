@@ -43,6 +43,18 @@ router.post(
 );
 
 /**
+ * @route   POST /api/v1/auth/login/phone-password
+ * @desc    Login with phone number and password (no OTP)
+ * @access  Public
+ */
+router.post(
+  '/login/phone-password',
+  authValidation.loginWithPhonePassword,
+  validate,
+  authController.loginWithPhonePassword
+);
+
+/**
  * @route   POST /api/v1/auth/social-login
  * @desc    Social login (Google, Facebook, Apple)
  * @access  Public

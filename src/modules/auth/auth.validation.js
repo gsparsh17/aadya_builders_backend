@@ -13,8 +13,8 @@ const authValidation = {
       .matches(/^[a-zA-Z\s]+$/).withMessage('Name can only contain letters and spaces'),
     
     body('email')
+      .optional()
       .trim()
-      .notEmpty().withMessage('Email is required')
       .isEmail().withMessage('Please provide a valid email address')
       .normalizeEmail(),
     
@@ -45,7 +45,7 @@ const authValidation = {
   ],
 
   /**
-   * Login validation rules
+   * Login with email and password (kept for backward compat / admin)
    */
   login: [
     body('email')
@@ -60,6 +60,19 @@ const authValidation = {
     body('rememberMe')
       .optional()
       .isBoolean().withMessage('Invalid value')
+  ],
+
+  /**
+   * Login with phone number and password
+   */
+  loginWithPhonePassword: [
+    body('phone')
+      .trim()
+      .notEmpty().withMessage('Phone number is required')
+      .matches(/^[6-9]\d{9}$/).withMessage('Please provide a valid 10-digit Indian mobile number'),
+
+    body('password')
+      .notEmpty().withMessage('Password is required'),
   ],
 
   /**
