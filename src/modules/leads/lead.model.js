@@ -203,11 +203,9 @@ const leadSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Prevent duplicate leads from same user for same property within 7 days
-leadSchema.index(
-  { property: 1, buyer: 1 },
-  { unique: true, partialFilterExpression: { createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } } }
-);
+// Prevent duplicate leads from same user for same property within 7 days is handled in the application layer
+// Removed the static MongoDB unique index because partialFilterExpression evaluates Date.now() only once on server start.
+leadSchema.index({ property: 1, buyer: 1 });
 leadSchema.index({ owner: 1, status: 1 });
 leadSchema.index({ buyer: 1, createdAt: -1 });
 leadSchema.index({ property: 1, status: 1 });

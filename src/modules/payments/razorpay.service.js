@@ -4,8 +4,8 @@ const crypto = require('crypto');
 class RazorpayService {
   constructor() {
     this.razorpay = new Razorpay({
-      key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_SloUMz3umcja7V',
-      key_secret: process.env.RAZORPAY_KEY_SECRET || '5d9fQJSTIQw8wCtgh94m2QBp',
+      key_id: process.env.RAZORPAY_KEY_ID || 'rzp_live_Slm0AfDR6JHcDr',
+      key_secret: process.env.RAZORPAY_KEY_SECRET || 'qvOrXy6Gtiu6of1drn7fsgeK',
     });
   }
 

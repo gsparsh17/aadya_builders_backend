@@ -51,14 +51,21 @@ class LeadService {
     }
     
     // Check for duplicate lead within 7 days
-    const existingLead = await Lead.findOne({
+    const duplicateQuery = {
       property: propertyId,
       buyer: buyerId,
       createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
-    });
+    };
+    
+    // If it's a project plot enquiry, only prevent duplicate for the same plot
+    if (isProject && message && message.includes('Plot Number')) {
+      duplicateQuery.message = message;
+    }
+    
+    const existingLead = await Lead.findOne(duplicateQuery);
     
     if (existingLead) {
-      throw new AppError('You have already contacted this owner recently. Please wait before trying again.', 400, 'DUPLICATE_LEAD');
+      throw new AppError('You have already contacted this owner recently about this property/plot. Please wait before trying again.', 400, 'DUPLICATE_LEAD');
     }
     
     // Get buyer details
