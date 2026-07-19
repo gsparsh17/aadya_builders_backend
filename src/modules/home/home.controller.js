@@ -10,10 +10,10 @@ const cityMatch = (city) => city ? { 'location.city': { $regex: `^${String(city)
 const projectCityMatch = (city) => city ? { city: { $regex: `^${String(city).trim()}$`, $options: 'i' } } : {};
 
 const offerings = [
-  { key: 'rent_home', title: 'Rent a home', subtitle: 'Apartments, builder floors, villas and more', image: '', deeplink: '/search?purpose=rent' },
-  { key: 'pg_coliving', title: 'PG and co-living', subtitle: 'Organised, owner and broker listed PGs', image: '', deeplink: '/search?propertyType=pg,co_living' },
-  { key: 'plots_land', title: 'Buy Plots/Land', subtitle: 'Residential Plots, Agricultural Farm lands, Inst. Lands and more', image: '', deeplink: '/search?propertyType=plot&purpose=land' },
-  { key: 'commercial', title: 'Buy a commercial property', subtitle: 'Office spaces, shops and commercial listings', image: '', deeplink: '/search?category=commercial' }
+  { key: 'rent_home', title: 'Rent a home', subtitle: 'Apartments, builder floors, villas and more', image: 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80', deeplink: '/search?purpose=rent' },
+  { key: 'pg_coliving', title: 'PG and co-living', subtitle: 'Organised, owner and broker listed PGs', image: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80', deeplink: '/search?propertyType=pg,co_living' },
+  { key: 'plots_land', title: 'Buy Plots/Land', subtitle: 'Residential Plots, Agricultural Farm lands, Inst. Lands and more', image: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80', deeplink: '/search?propertyType=plot&purpose=land' },
+  { key: 'commercial', title: 'Buy a commercial property', subtitle: 'Office spaces, shops and commercial listings', image: 'https://images.unsplash.com/photo-1497366216548-37526070297c?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80', deeplink: '/search?category=commercial' }
 ];
 
 const popularTools = [
@@ -86,7 +86,15 @@ class HomeController {
         recommendedProperties,
         recommendedProjects,
         localitiesYouMayLike: localitiesYouMayLike.map(x => ({ city: x._id.city, locality: x._id.locality, propertiesCount: x.propertiesCount, avgPricePerSqft: Math.round(x.avgPricePerSqft || 0) })),
-        popularCities: popularCities.map(x => ({ name: x._id, propertyCount: x.propertyCount })),
+        popularCities: popularCities.map(x => {
+          const cityImages = {
+            'Mumbai': 'https://lh3.googleusercontent.com/gps-cs-s/AHRPTWlR0gFyLbdJceXPIwR2HmWcvUfPrVOZwjh8UfLnjnXUPuIv_lEDZXfFg073Ug96sx0Y8uZUUv64w0Sv1jwuiYRsmluNLb8OjXEDjTG8Yow-ppfRNAWRQFZnGMBzU7__x82F1Rn-=w675-h390-n-k-no',
+            'Lucknow': 'https://encrypted-tbn0.gstatic.com/licensed-image?q=tbn:ANd9GcTcONdcrngIkDUTn0J5xc4y3XaBbB3KxqI2e8Wf2OCffERFMAv9frndX1EDxWDzhjGfu5zsVX4z_UkpemYDMjYFIqo&s=19',
+            'Kanpur': 'https://upload.wikimedia.org/wikipedia/commons/a/af/J.K._Temple_%28cropped%29.jpg',
+            'Bangalore': 'https://upload.wikimedia.org/wikipedia/commons/c/cd/View_from_Visvesvaraya_Industrial_and_Technological_Museum_%282025%29_02.jpg'
+          };
+          return { name: x._id, propertyCount: x.propertyCount, image: cityImages[x._id] || '' };
+        }),
         popularBuilders,
         topGainers: topGainers.map((x, index) => ({ rank: index + 1, locality: x._id, city, avgPricePerSqft: Math.round(x.avgPricePerSqft || 0), appreciationPercent: Math.floor(Math.random() * 10) + 5 + Math.random(), listingsCount: x.listingsCount, period: '1Y' })),
         propertyTypeStats: propertyTypeStats.map(x => ({ type: x._id, label: String(x._id || '').replace(/_/g, ' '), count: x.count })),
