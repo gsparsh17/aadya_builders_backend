@@ -98,10 +98,7 @@ class PropertyService {
       throw new AppError('User not found', 404, 'USER_NOT_FOUND');
     }
 
-    // Check if user can post property
-    if (!user.canPostProperty()) {
-      throw new AppError('You have reached your listing limit. Please upgrade your plan.', 403, 'LISTING_LIMIT_REACHED');
-    }
+    // Unlimited property creation bypass
 
     // Geocode address if coordinates not provided
     if (!propertyData.location?.coordinates) {
@@ -128,10 +125,9 @@ class PropertyService {
       status: 'pending'
     });
 
-    // Update user's listing count
+    // Update user's listing count (disabled while subscription restrictions are off)
     if (user.subscription) {
       user.subscription.listingsPosted = (user.subscription.listingsPosted || 0) + 1;
-      user.subscription.listingsRemaining = Math.max(0, (user.subscription.listingsRemaining || 0) - 1);
       await user.save();
     }
 

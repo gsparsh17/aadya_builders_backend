@@ -262,6 +262,71 @@ class PropertyController {
   }
 
   /**
+   * Upload standalone property media (images and videos) to Cloudinary before property post
+   * @route POST /api/v1/properties/upload-media
+   */
+  async uploadStandaloneMedia(req, res, next) {
+    try {
+      const imagesFiles = req.files?.images || [];
+      const videosFiles = req.files?.videos || [];
+
+      if (imagesFiles.length === 0 && videosFiles.length === 0) {
+        throw new AppError('Please upload at least one image or video', 400, 'NO_MEDIA');
+      }
+
+      const uploadedImages = [];
+      for (let i = 0; i < imagesFiles.length; i++) {
+        const file = imagesFiles[i];
+        const result = await uploadToCloudinary(file.buffer, {
+          folder: 'aadya/properties/images',
+          resourceType: 'image'
+        });
+
+        uploadedImages.push({
+          url: result.secure_url,
+          publicId: result.public_id,
+          caption: '',
+          isPrimary: i === 0,
+          order: i,
+          uploadedAt: new Date()
+        });
+      }
+
+      const uploadedVideos = [];
+      for (let i = 0; i < videosFiles.length; i++) {
+        const file = videosFiles[i];
+        const result = await uploadToCloudinary(file.buffer, {
+          folder: 'aadya/properties/videos',
+          resourceType: 'video'
+        });
+
+        const thumbnailUrl = result.secure_url
+          .replace('/video/upload/', '/video/upload/w_400,h_300,c_fill,so_2/')
+          .replace(/\.[^.]+$/, '.jpg');
+
+        uploadedVideos.push({
+          url: result.secure_url,
+          publicId: result.public_id,
+          caption: '',
+          duration: result.duration || null,
+          thumbnail: thumbnailUrl,
+          order: i,
+          uploadedAt: new Date()
+        });
+      }
+
+      return successResponse(
+        res,
+        { images: uploadedImages, videos: uploadedVideos },
+        'Media uploaded successfully'
+      );
+    } catch (error) {
+      logger.error('Upload standalone media error:', error);
+      next(error);
+    }
+  }
+
+  /**
    * Upload property images to Cloudinary
    * @route POST /api/v1/properties/:id/images
    */

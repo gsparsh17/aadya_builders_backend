@@ -42,10 +42,15 @@ const uploadToCloudinary = (fileBuffer, options = {}) => {
       uploadOptions.transformation = transformation;
     }
 
-    // For images, apply quality optimization
+    // For images, apply quality optimization and maximum dimension bounding
     if (resourceType === 'image') {
       uploadOptions.quality = 'auto:good';
       uploadOptions.fetch_format = 'auto';
+      if (!uploadOptions.transformation) {
+        uploadOptions.transformation = [
+          { width: 1920, height: 1920, crop: 'limit' }
+        ];
+      }
     }
 
     // For videos, generate a thumbnail eagerly

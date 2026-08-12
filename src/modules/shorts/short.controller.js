@@ -36,8 +36,8 @@ class ShortController {
         throw new AppError('Please upload a video file', 400, 'NO_VIDEO');
       }
 
-      const property = await Property.findOne({ _id: req.body.property, owner: req.user._id });
-      if (!property && req.user.role !== 'admin') throw new AppError('Property not found or access denied', 404, 'PROPERTY_NOT_FOUND');
+      const property = await Property.findById(req.body.property);
+      if (!property) throw new AppError('Linked property not found', 404, 'PROPERTY_NOT_FOUND');
       
       const result = await uploadToCloudinary(file.buffer, {
         folder: 'aadya/shorts/videos',
@@ -95,6 +95,48 @@ class ShortController {
     try {
       const shorts = await Short.find({ property: req.params.id, status: 'active' }).sort({ createdAt: -1 });
       return successResponse(res, shorts, 'Property shorts retrieved successfully');
+    } catch (error) { next(error); }
+  }
+
+  async myShorts(req, res, next) {
+    try {
+      const shorts = await Short.find({ owner: req.user._id })
+        .populate('property', 'title price location')
+        .sort({ createdAt: -1 });
+      return successResponse(res, shorts, 'My shorts retrieved successfully');
+    } catch (error) { next(error); }
+  }
+
+  async update(req, res, next) {
+    try {
+      const short = await Short.findById(req.params.id);
+      if (!short) throw new AppError('Short not found', 404, 'SHORT_NOT_FOUND');
+      
+      if (short.owner.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+        throw new AppError('Access denied', 403, 'ACCESS_DENIED');
+      }
+
+      if (req.body.caption !== undefined) short.caption = req.body.caption;
+      if (req.body.city !== undefined) short.city = req.body.city;
+      if (req.body.locality !== undefined) short.locality = req.body.locality;
+      if (req.body.status !== undefined) short.status = req.body.status;
+
+      await short.save();
+      return successResponse(res, short, 'Short updated successfully');
+    } catch (error) { next(error); }
+  }
+
+  async remove(req, res, next) {
+    try {
+      const short = await Short.findById(req.params.id);
+      if (!short) throw new AppError('Short not found', 404, 'SHORT_NOT_FOUND');
+
+      if (short.owner.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+        throw new AppError('Access denied', 403, 'ACCESS_DENIED');
+      }
+
+      await short.deleteOne();
+      return successResponse(res, null, 'Short deleted successfully');
     } catch (error) { next(error); }
   }
 }

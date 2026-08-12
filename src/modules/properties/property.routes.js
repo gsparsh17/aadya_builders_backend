@@ -5,7 +5,7 @@ const propertyValidation = require('./property.validation');
 const { validate } = require('../../middlewares/validation.middleware');
 const { authMiddleware, optionalAuth } = require('../../middlewares/auth.middleware');
 const { authorize } = require('../../middlewares/role.middleware');
-const { uploadImages, uploadVideos } = require('../../middlewares/upload.middleware');
+const { uploadImages, uploadVideos, uploadMedia } = require('../../middlewares/upload.middleware');
 const propertyStatsController = require('./propertyStats.controller');
 const shortController = require('../shorts/short.controller');
 const boostController = require('../boost/boost.controller');
@@ -37,6 +37,7 @@ router.get('/:id', optionalAuth, propertyValidation.getById, validate, propertyC
 
 // ==================== Protected Routes ====================
 
+router.post('/upload-media', authMiddleware, uploadMedia.fields([{ name: 'images', maxCount: 20 }, { name: 'videos', maxCount: 5 }]), propertyController.uploadStandaloneMedia);
 router.post('/', authMiddleware, authorize('owner', 'dealer', 'builder', 'admin', 'buyer'), propertyValidation.create, validate, propertyController.createProperty);
 router.put('/:id', authMiddleware, propertyValidation.update, validate, propertyController.updateProperty);
 router.post('/:id/boost', authMiddleware, boostController.boostProperty);

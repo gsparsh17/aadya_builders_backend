@@ -12,7 +12,10 @@ router.post('/:id/view', controller.view);
 router.post('/:id/share', controller.share);
 
 router.use(authMiddleware);
-router.post('/', authorize('owner', 'dealer', 'builder', 'admin'), uploadVideos.single('video'), controller.create);
+router.get('/my-shorts', controller.myShorts);
+router.post('/', uploadVideos.single('video'), controller.create);
+router.put('/:id', controller.update);
+router.delete('/:id', controller.remove);
 router.post('/:id/like', controller.like);
 router.delete('/:id/like', controller.unlike);
 

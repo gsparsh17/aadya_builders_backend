@@ -424,8 +424,9 @@ class UserController {
       const Property = require('../properties/property.model');
       const Project = require('../projects/project.model');
       const Lead = require('../leads/lead.model');
+      const Short = require('../shorts/short.model');
 
-      const [stats, recentProperties, recentProjects, rawLeads] = await Promise.all([
+      const [stats, recentProperties, recentProjects, rawLeads, recentShorts] = await Promise.all([
         userService.getUserStats(userId),
         Property.find({ owner: userId })
           .sort({ createdAt: -1 })
@@ -444,6 +445,11 @@ class UserController {
           .sort({ createdAt: -1 })
           .limit(5)
           .populate('buyer', 'name')
+          .lean(),
+        Short.find({ owner: userId })
+          .sort({ createdAt: -1 })
+          .limit(10)
+          .populate('property', 'title price location')
           .lean()
       ]);
 
@@ -472,7 +478,8 @@ class UserController {
         stats,
         recentProperties,
         recentProjects,
-        recentLeads
+        recentLeads,
+        recentShorts
       }, 'Dashboard data retrieved successfully');
     } catch (error) {
       next(error);

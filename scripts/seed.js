@@ -5,6 +5,7 @@ const path = require('path');
 dotenv.config({ path: path.join(__dirname, '../.env') });
 
 const User = require('../src/modules/users/user.model');
+const BoostPlan = require('../src/modules/boost/boostPlan.model');
 
 const connectDB = async () => {
   try {
@@ -70,6 +71,19 @@ const seedAdmin = async () => {
       console.log('Admin user created successfully.');
       console.log(`Email: ${admin.email}`);
     }
+
+    const boostPlans = [
+      { name: '1 Day Boost', description: 'Quick visibility boost', price: 9, durationDays: 1, multiplier: 2, isActive: true },
+      { name: '3 Days Boost', description: 'Improve property visibility for 3 days', price: 29, durationDays: 3, multiplier: 3, isActive: true },
+      { name: '7 Days Boost', description: 'Improve property visibility for 7 days', price: 59, durationDays: 7, multiplier: 3, isActive: true },
+      { name: '15 Days Boost', description: 'Improve property visibility for 15 days', price: 119, durationDays: 15, multiplier: 3, isActive: true },
+      { name: '30 Days Boost', description: 'Improve property visibility for 30 days', price: 199, durationDays: 30, multiplier: 4, isActive: true }
+    ];
+
+    for (const plan of boostPlans) {
+      await BoostPlan.findOneAndUpdate({ name: plan.name }, plan, { upsert: true, new: true });
+    }
+    console.log('Boost plans seeded successfully.');
 
     await mongoose.connection.close();
     console.log('MongoDB connection closed');
