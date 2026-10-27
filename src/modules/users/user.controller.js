@@ -369,13 +369,13 @@ class UserController {
    */
   async saveSearch(req, res, next) {
     try {
-      const { name, filters } = req.body;
+      const { name, filters, alerts } = req.body;
 
       if (!name || !filters) {
         throw new AppError('Name and filters are required', 400, 'MISSING_FIELDS');
       }
 
-      const searches = await userService.saveSearch(req.user.id, name, filters);
+      const searches = await userService.saveSearch(req.user.id, name, filters, alerts);
 
       return successResponse(res, searches, 'Search saved successfully');
     } catch (error) {
@@ -387,6 +387,19 @@ class UserController {
    * Delete saved search
    * @route DELETE /api/v1/users/saved-searches/:searchId
    */
+  /**
+   * Turn new-listing alerts on/off for a saved search
+   * @route PUT /api/v1/users/saved-searches/:searchId
+   */
+  async updateSavedSearch(req, res, next) {
+    try {
+      const searches = await userService.setSavedSearchAlerts(req.user.id, req.params.searchId, req.body.alerts);
+      return successResponse(res, searches, 'Saved search updated');
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async deleteSavedSearch(req, res, next) {
     try {
       const { searchId } = req.params;

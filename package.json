@@ -17,7 +17,8 @@
     "sync:elasticsearch": "node scripts/elasticsearch-sync.js",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
-    "docker:logs": "docker-compose logs -f"
+    "docker:logs": "docker-compose logs -f",
+    "seed:plans": "node scripts/seed-plans.js"
   },
   "engines": {
     "node": ">=18.0.0",

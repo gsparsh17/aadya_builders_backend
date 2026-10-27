@@ -151,6 +151,9 @@ const userSchema = new mongoose.Schema({
   savedSearches: [{
     name: String,
     filters: mongoose.Schema.Types.Mixed,
+    // Notify the user when a new listing matches these filters
+    alerts: { type: Boolean, default: true },
+    lastAlertAt: Date,
     createdAt: { type: Date, default: Date.now }
   }],
   recentViews: [{

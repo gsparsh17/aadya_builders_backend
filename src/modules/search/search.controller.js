@@ -25,13 +25,9 @@ class SearchController {
       
       const result = await searchService.searchProperties(req.query, page, limit, useCache);
       
-      // Track search for logged-in users
-      if (req.user && Object.keys(req.query).length > 0) {
-        searchService.saveSearch(req.user.id, {
-          filters: req.query
-        }).catch(err => logger.error('Failed to save search:', err));
-      }
-      
+      // Searches are no longer auto-saved: "saved searches" are the ones a
+      // user explicitly saves (POST /users/saved-searches) and get alerts for.
+
       return paginatedResponse(res, result.properties, page, limit, result.total, 'Search results retrieved successfully', {
         facets: result.facets
       });

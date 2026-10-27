@@ -413,7 +413,7 @@ class LeadService {
     
     const [leads, total] = await Promise.all([
       Lead.find(query)
-        .populate('property', 'title price purpose location primaryImage propertyCode status')
+        .populate('property', 'title price purpose location images propertyCode status')
         .populate('owner', 'name phone')
         .sort({ createdAt: -1 })
         .skip(skip)

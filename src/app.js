@@ -199,6 +199,8 @@ const routeModules = [
   { path: `${API_PREFIX}/shorts`, module: './modules/shorts/short.routes', name: 'Shorts' },
   { path: `${API_PREFIX}/layouts`, module: './modules/layouts/layout.routes', name: 'Layouts' },
   { path: `${API_PREFIX}/catalog`, module: './modules/catalog/catalog.routes', name: 'Catalog' },
+  { path: `${API_PREFIX}/reports`, module: './modules/reports/report.routes', name: 'Reports' },
+  { path: `${API_PREFIX}/reviews`, module: './modules/reviews/review.routes', name: 'Reviews' },
 ];
 
 // ✅ SAFE LOADER (FIXED)

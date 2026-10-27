@@ -99,7 +99,31 @@ class PropertyService {
       throw new AppError('User not found', 404, 'USER_NOT_FOUND');
     }
 
-    // Unlimited property creation bypass
+    // Listing limits: free users get FREE_LIMITS.OWNER_MAX_LISTINGS live or
+    // pending listings; an active plan raises that to its listing limit.
+    // Off unless ENFORCE_LISTING_LIMITS=true, so it can be switched on once
+    // plans are live without affecting existing users before then.
+    if (process.env.ENFORCE_LISTING_LIMITS === 'true' && user.role !== 'admin') {
+      const { FREE_LIMITS } = require('../../utils/constants');
+      const sub = user.subscription || {};
+      const planActive = sub.isActive && (!sub.endDate || new Date(sub.endDate) > new Date());
+      let limit = FREE_LIMITS.OWNER_MAX_LISTINGS;
+      if (planActive && sub.plan) {
+        const SubscriptionPlan = require('../payments/subscription.model');
+        const plan = await SubscriptionPlan.findById(sub.plan).select('listingLimit');
+        if (plan?.listingLimit) limit = plan.listingLimit;
+      }
+      const live = await Property.countDocuments({ owner: userId, status: { $in: ['active', 'pending'] } });
+      if (live >= limit) {
+        throw new AppError(
+          planActive
+            ? `Your plan allows ${limit} active listings. Upgrade to post more.`
+            : `Free accounts can have ${limit} active listings. Choose a plan to post more.`,
+          403,
+          'LISTING_LIMIT_REACHED'
+        );
+      }
+    }
 
     // Geocode address if coordinates not provided
     if (!propertyData.location?.coordinates) {
@@ -234,11 +258,25 @@ class PropertyService {
       updateData.location.coordinates = geoCoordinates;
     }
 
+    // Track price changes so buyers see drops and savers get alerted
+    const oldPrice = property.price;
+    const newPrice = updateData.price !== undefined ? Number(updateData.price) : oldPrice;
+    const update = { $set: updateData };
+    if (Number.isFinite(newPrice) && newPrice !== oldPrice) {
+      update.$push = { priceHistory: { price: oldPrice, changedAt: new Date() } };
+    }
+
     const updatedProperty = await Property.findByIdAndUpdate(
       propertyId,
-      { $set: updateData },
+      update,
       { new: true, runValidators: true }
     );
+
+    if (updatedProperty && newPrice < oldPrice && updatedProperty.status === 'active') {
+      notificationService.sendPriceDropAlert(updatedProperty, oldPrice).catch(err =>
+        logger.error('Failed to send price drop alert:', err)
+      );
+    }
 
     // Clear cache
     await clearCache(`property:${propertyId}*`);
@@ -326,6 +364,9 @@ class PropertyService {
       // Async so it doesn't block the request
       notificationService.sendListingAlert(property, 'property').catch(err => 
         logger.error('Failed to trigger property notification:', err)
+      );
+      notificationService.sendSavedSearchAlerts(property).catch(err =>
+        logger.error('Failed to trigger saved search alerts:', err)
       );
     }
 
@@ -856,6 +897,12 @@ class PropertyService {
     }
 
     await property.save();
+
+    if (isVerified) {
+      notificationService.sendSavedSearchAlerts(property).catch(err =>
+        logger.error('Failed to trigger saved search alerts:', err)
+      );
+    }
 
     // Notify owner
     const User = require('../users/user.model');

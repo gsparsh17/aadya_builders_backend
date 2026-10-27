@@ -338,6 +338,14 @@ const propertySchema = new mongoose.Schema({
   },
 
   // Metrics
+  // Every price change, newest last; lets clients show "Price dropped".
+  priceHistory: {
+    type: [{
+      price: Number,
+      changedAt: { type: Date, default: Date.now }
+    }],
+    default: []
+  },
   views: {
     type: Number,
     default: 0

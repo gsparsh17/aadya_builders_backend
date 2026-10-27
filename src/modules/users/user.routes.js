@@ -127,6 +127,15 @@ router.post('/saved-searches',
   userController.saveSearch
 );
 
+router.put('/saved-searches/:searchId',
+  [
+    param('searchId').isMongoId().withMessage('Invalid search ID'),
+    body('alerts').isBoolean().withMessage('alerts must be true or false'),
+    validate
+  ],
+  userController.updateSavedSearch
+);
+
 router.delete('/saved-searches/:searchId',
   [
     param('searchId').isMongoId().withMessage('Invalid search ID'),

@@ -73,6 +73,101 @@ class NotificationService {
   }
 
   /**
+   * Notify users whose saved searches (with alerts on) match a newly active
+   * property. Matching reuses the search query builder, so an alert fires
+   * exactly when the property would appear in that saved search's results.
+   * Each user is notified at most once per property.
+   */
+  async sendSavedSearchAlerts(property) {
+    try {
+      if (property.status !== 'active') return;
+      const Property = require('../properties/property.model');
+      const searchFilters = require('../search/search.filters');
+      const city = property.location?.city || '';
+      const escaped = city.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+      const users = await User.find({
+        _id: { $ne: property.owner },
+        isActive: true,
+        isBlocked: { $ne: true },
+        savedSearches: {
+          $elemMatch: {
+            alerts: true,
+            $or: [
+              { 'filters.city': { $regex: `^${escaped}$`, $options: 'i' } },
+              { 'filters.city': { $exists: false } },
+            ],
+          },
+        },
+      }).select('_id savedSearches');
+
+      for (const user of users) {
+        const already = await Notification.exists({ recipient: user._id, relatedId: property._id, type: 'saved_search' });
+        if (already) continue;
+
+        let matched = null;
+        for (const search of user.savedSearches) {
+          if (!search.alerts || !search.filters) continue;
+          const query = searchFilters.buildQuery({ ...search.filters, page: undefined, limit: undefined, sort: undefined });
+          if (await Property.exists({ ...query, _id: property._id })) {
+            matched = search;
+            break;
+          }
+        }
+        if (!matched) continue;
+
+        const title = `New match for "${matched.name}"`;
+        const message = `${property.title} · ${property.location?.locality || ''}, ${city}`;
+        const imageUrl = property.images?.[0]?.url || null;
+        await Notification.create({
+          recipient: user._id,
+          title,
+          message,
+          type: 'saved_search',
+          relatedId: property._id,
+          data: { itemType: 'property', itemId: property._id.toString(), imageUrl, savedSearchId: matched._id.toString() },
+        });
+        matched.lastAlertAt = new Date();
+        await user.save();
+        oneSignalService
+          .sendPushNotification([user._id.toString()], title, message, { type: 'saved_search', itemId: property._id.toString() }, imageUrl)
+          .catch((err) => logger.error('Saved search push failed:', err));
+      }
+    } catch (error) {
+      logger.error('Failed to send saved search alerts:', error);
+    }
+  }
+
+  /**
+   * Tell everyone who saved a property that its price went down.
+   */
+  async sendPriceDropAlert(property, oldPrice) {
+    try {
+      const users = await User.find({ savedProperties: property._id, _id: { $ne: property.owner }, isActive: true }).select('_id');
+      if (!users.length) return;
+      const drop = Math.round(oldPrice - property.price);
+      const pct = Math.round((drop / oldPrice) * 100);
+      const title = `Price dropped by ${pct}% on a home you saved`;
+      const message = `${property.title} is now ₹${property.price.toLocaleString('en-IN')} (was ₹${oldPrice.toLocaleString('en-IN')}).`;
+      const imageUrl = property.images?.[0]?.url || null;
+      await Notification.insertMany(users.map((u) => ({
+        recipient: u._id,
+        title,
+        message,
+        type: 'price_drop',
+        relatedId: property._id,
+        data: { itemType: 'property', itemId: property._id.toString(), imageUrl, oldPrice, newPrice: property.price },
+      })));
+      await oneSignalService.sendPushNotification(
+        users.map((u) => u._id.toString()), title, message,
+        { type: 'price_drop', itemId: property._id.toString() }, imageUrl,
+      );
+    } catch (error) {
+      logger.error('Failed to send price drop alert:', error);
+    }
+  }
+
+  /**
    * Generates notifications for properties and projects matching the user's city.
    * Runs whenever the user opens the app (requested in getMyNotifications).
    * Ensures no duplicates are created.

@@ -269,7 +269,7 @@ class UserService {
     return user.preferences;
   }
 
-  async saveSearch(userId, searchName, filters) {
+  async saveSearch(userId, searchName, filters, alerts = true) {
     const user = await User.findById(userId);
 
     if (!user) {
@@ -283,9 +283,24 @@ class UserService {
     user.savedSearches.unshift({
       name: searchName,
       filters: filters,
+      alerts: alerts !== false,
       createdAt: new Date()
     });
 
+    await user.save();
+    return user.savedSearches;
+  }
+
+  async setSavedSearchAlerts(userId, searchId, alerts) {
+    const user = await User.findById(userId);
+    if (!user) {
+      throw new AppError('User not found', 404, 'USER_NOT_FOUND');
+    }
+    const search = user.savedSearches.id(searchId);
+    if (!search) {
+      throw new AppError('Saved search not found', 404, 'SAVED_SEARCH_NOT_FOUND');
+    }
+    search.alerts = Boolean(alerts);
     await user.save();
     return user.savedSearches;
   }
