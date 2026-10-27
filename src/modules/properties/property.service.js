@@ -9,6 +9,7 @@ const emailService = require('../../utils/emailService');
 const smsService = require('../../utils/smsService');
 const notificationService = require('../notifications/notification.service');
 const axios = require('axios');
+const searchFilters = require('../search/search.filters');
 
 /**
  * Property Service - Handles all business logic for property operations
@@ -339,119 +340,9 @@ class PropertyService {
    * Search properties with filters
    */
   async searchProperties(filters, page = 1, limit = 20) {
-    const query = { status: 'active' };
-
-    // Purpose filter
-    if (filters.purpose) {
-      query.purpose = filters.purpose;
-    }
-
-    // Property type filter
-    if (filters.propertyType) {
-      const types = filters.propertyType.split(',').map(t => t.trim());
-      query.propertyType = { $in: types };
-    }
-
-    // City filter
-    if (filters.city) {
-      query['location.city'] = { $regex: filters.city, $options: 'i' };
-    }
-
-    // Locality filter
-    if (filters.locality) {
-      query['location.locality'] = { $regex: filters.locality, $options: 'i' };
-    }
-
-    // Price range filter
-    if (filters.minPrice || filters.maxPrice) {
-      query.price = {};
-      if (filters.minPrice) query.price.$gte = parseFloat(filters.minPrice);
-      if (filters.maxPrice) query.price.$lte = parseFloat(filters.maxPrice);
-    }
-
-    // Area range filter
-    if (filters.minArea || filters.maxArea) {
-      query['area.value'] = {};
-      if (filters.minArea) query['area.value'].$gte = parseFloat(filters.minArea);
-      if (filters.maxArea) query['area.value'].$lte = parseFloat(filters.maxArea);
-    }
-
-    // BHK filter
-    if (filters.bhk) {
-      const bhkValues = filters.bhk.split(',').map(b => {
-        if (b === '4+') return { $gte: 4 };
-        return parseInt(b);
-      });
-
-      if (bhkValues.some(v => typeof v === 'object')) {
-        query.$or = bhkValues.map(v => {
-          if (typeof v === 'object') return { bedrooms: v };
-          return { bedrooms: v };
-        });
-      } else {
-        query.bedrooms = { $in: bhkValues };
-      }
-    }
-
-    // Furnishing filter
-    if (filters.furnishing) {
-      query.furnishing = filters.furnishing;
-    }
-
-    // Amenities filter
-    if (filters.amenities) {
-      const amenities = filters.amenities.split(',').map(a => a.trim());
-      query.amenities = { $all: amenities };
-    }
-
-    // Posted by filter
-    if (filters.postedBy) {
-      query.ownerType = filters.postedBy;
-    }
-
-    // Verification filter
-    if (filters.verified === 'true') {
-      query.isVerified = true;
-    }
-
-    // Featured filter
-    if (filters.featured === 'true') {
-      query.isFeatured = true;
-    }
-
-    // Geospatial search
-    if (filters.latitude && filters.longitude && filters.radius) {
-      query['location.coordinates'] = {
-        $near: {
-          $geometry: {
-            type: 'Point',
-            coordinates: [parseFloat(filters.longitude), parseFloat(filters.latitude)]
-          },
-          $maxDistance: parseFloat(filters.radius) * 1000 // Convert km to meters
-        }
-      };
-    }
-
-    // Determine sort order
-    let sortOptions = {};
-    switch (filters.sort) {
-      case 'price_asc':
-        sortOptions = { price: 1 };
-        break;
-      case 'price_desc':
-        sortOptions = { price: -1 };
-        break;
-      case 'newest':
-        sortOptions = { createdAt: -1 };
-        break;
-      case 'oldest':
-        sortOptions = { createdAt: 1 };
-        break;
-      case 'relevance':
-      default:
-        sortOptions = { rankingScore: -1, createdAt: -1 };
-        break;
-    }
+    // Shares the query/sort builder with /search so both endpoints filter identically
+    const query = searchFilters.buildQuery(filters);
+    const sortOptions = searchFilters.buildSortOptions(filters.sort);
 
     // Execute query
     const skip = (page - 1) * limit;

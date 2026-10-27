@@ -4,6 +4,8 @@ const Project = require('../projects/project.model');
 const searchFilters = require('./search.filters');
 const { AppError } = require('../../middlewares/errorHandler');
 const logger = require('../../utils/logger');
+
+const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const redisClient = require('../../config/redis');
 
 /**
@@ -205,7 +207,7 @@ class SearchService {
     }
     
     const suggestions = [];
-    const searchRegex = { $regex: `^${query}`, $options: 'i' };
+    const searchRegex = { $regex: `^${escapeRegex(query)}`, $options: 'i' };
     
     if (type === 'all' || type === 'locality') {
       const localities = await Property.distinct('location.locality', {
@@ -307,7 +309,7 @@ class SearchService {
     
     if (preferredLocations && preferredLocations.length > 0) {
       const cities = preferredLocations.map(loc => loc.city);
-      query['location.city'] = { $in: cities.map(c => new RegExp(c, 'i')) };
+      query['location.city'] = { $in: cities.map(c => new RegExp(escapeRegex(c), 'i')) };
     }
     
     if (propertyTypes && propertyTypes.length > 0) {
@@ -356,8 +358,8 @@ class SearchService {
         $match: {
           status: 'active',
           $or: [
-            { 'location.city': { $regex: `^${query}`, $options: 'i' } },
-            { 'location.locality': { $regex: `^${query}`, $options: 'i' } }
+            { 'location.city': { $regex: `^${escapeRegex(query)}`, $options: 'i' } },
+            { 'location.locality': { $regex: `^${escapeRegex(query)}`, $options: 'i' } }
           ]
         }
       },

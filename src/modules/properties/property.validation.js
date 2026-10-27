@@ -159,20 +159,20 @@ const propertyValidation = {
     
     query('furnishing')
       .optional()
-      .isIn(['furnished', 'semi_furnished', 'unfurnished'])
+      .custom((value) => String(value).split(',').every((f) => ['furnished', 'semi_furnished', 'unfurnished'].includes(f.trim())))
       .withMessage('Invalid furnishing status'),
-    
+
     query('amenities')
       .optional()
       .isString().withMessage('Invalid amenities'),
-    
+
     query('postedBy')
       .optional()
-      .isIn(['owner', 'dealer', 'builder']).withMessage('Invalid posted by filter'),
-    
+      .isIn(['individual', 'owner', 'dealer', 'builder']).withMessage('Invalid posted by filter'),
+
     query('sort')
       .optional()
-      .isIn(['price_asc', 'price_desc', 'newest', 'oldest', 'relevance'])
+      .isIn(['price_asc', 'price_desc', 'newest', 'oldest', 'relevance', 'area_asc', 'area_desc', 'price_per_sqft_asc', 'price_per_sqft_desc', 'popularity', 'views_desc'])
       .withMessage('Invalid sort option'),
     
     query('page')

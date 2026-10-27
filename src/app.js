@@ -198,6 +198,7 @@ const routeModules = [
   { path: `${API_PREFIX}/boost`, module: './modules/boost/boost.routes', name: 'Boost' },
   { path: `${API_PREFIX}/shorts`, module: './modules/shorts/short.routes', name: 'Shorts' },
   { path: `${API_PREFIX}/layouts`, module: './modules/layouts/layout.routes', name: 'Layouts' },
+  { path: `${API_PREFIX}/catalog`, module: './modules/catalog/catalog.routes', name: 'Catalog' },
 ];
 
 // ✅ SAFE LOADER (FIXED)

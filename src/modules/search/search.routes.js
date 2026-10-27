@@ -17,6 +17,7 @@ router.get(
   '/',
   optionalAuth,
   [
+    query('segment').optional().isIn(['buy', 'rent', 'pg', 'plots', 'commercial']),
     query('purpose').optional().isIn(['buy', 'rent', 'new_launch', 'commercial_buy', 'commercial_lease', 'land']),
     query('propertyType').optional().isString(),
     query('city').optional().isString(),
@@ -28,7 +29,7 @@ router.get(
     query('bhk').optional().isString(),
     query('furnishing').optional().isString(),
     query('amenities').optional().isString(),
-    query('postedBy').optional().isIn(['individual', 'dealer', 'builder']),
+    query('postedBy').optional().isIn(['individual', 'owner', 'dealer', 'builder']),
     query('sort').optional().isString(),
     query('page').optional().isInt({ min: 1 }),
     query('limit').optional().isInt({ min: 1, max: 100 }),

@@ -2,50 +2,62 @@
  * Search Filters Builder - Builds MongoDB queries from search parameters
  */
 
+const { getSegment } = require('../catalog/catalog.config');
+
+const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 class SearchFiltersBuilder {
-  
+
   /**
    * Build MongoDB query from search parameters
    */
   buildQuery(params) {
     const query = { status: 'active' };
-    
+
+    // Segment filter (buy, rent, pg, plots, commercial). An explicit purpose
+    // or propertyType narrows the segment rather than replacing it.
+    const segment = params.segment ? getSegment(params.segment) : null;
+    if (segment) {
+      query.purpose = { $in: segment.purposes };
+      query.propertyType = { $in: segment.propertyTypes };
+    }
+
     // Purpose filter
     if (params.purpose) {
       query.purpose = params.purpose;
     }
-    
+
     // Property type filter (supports comma-separated values)
     if (params.propertyType) {
       const types = params.propertyType.split(',').map(t => t.trim());
       query.propertyType = { $in: types };
     }
-    
+
     // Category filter
     if (params.category) {
       query.category = params.category;
     }
-    
+
     // City filter (case-insensitive)
     if (params.city) {
-      query['location.city'] = { $regex: params.city, $options: 'i' };
+      query['location.city'] = { $regex: escapeRegex(params.city.trim()), $options: 'i' };
     }
-    
+
     // Multiple cities
     if (params.cities) {
       const cities = params.cities.split(',').map(c => c.trim());
-      query['location.city'] = { $in: cities.map(c => new RegExp(c, 'i')) };
+      query['location.city'] = { $in: cities.map(c => new RegExp(escapeRegex(c), 'i')) };
     }
-    
+
     // Locality filter
     if (params.locality) {
       const localities = params.locality.split(',').map(l => l.trim());
-      query['location.locality'] = { $in: localities.map(l => new RegExp(l, 'i')) };
+      query['location.locality'] = { $in: localities.map(l => new RegExp(escapeRegex(l), 'i')) };
     }
-    
+
     // State filter
     if (params.state) {
-      query['location.state'] = { $regex: params.state, $options: 'i' };
+      query['location.state'] = { $regex: escapeRegex(params.state), $options: 'i' };
     }
     
     // Price range
@@ -126,9 +138,9 @@ class SearchFiltersBuilder {
       query.amenities = { $all: amenities };
     }
     
-    // Posted by filter
+    // Posted by filter ('owner' is the user-facing name for 'individual')
     if (params.postedBy) {
-      query.ownerType = params.postedBy;
+      query.ownerType = params.postedBy === 'owner' ? 'individual' : params.postedBy;
     }
     
     // Owner type filter
@@ -173,7 +185,7 @@ class SearchFiltersBuilder {
     
     // Text search (title, description, locality)
     if (params.q || params.query || params.search) {
-      const searchTerm = params.q || params.query || params.search;
+      const searchTerm = escapeRegex(params.q || params.query || params.search);
       query.$or = [
         { title: { $regex: searchTerm, $options: 'i' } },
         { description: { $regex: searchTerm, $options: 'i' } },
@@ -183,16 +195,17 @@ class SearchFiltersBuilder {
       ];
     }
     
-    // Geospatial search
+    // Geospatial search. $geoWithin (unlike $near) is allowed in countDocuments
+    // and aggregation $match, which every search path uses.
     if (params.latitude && params.longitude) {
       const radius = parseFloat(params.radius) || 5; // Default 5km
+      const EARTH_RADIUS_KM = 6378.1;
       query['location.coordinates'] = {
-        $near: {
-          $geometry: {
-            type: 'Point',
-            coordinates: [parseFloat(params.longitude), parseFloat(params.latitude)]
-          },
-          $maxDistance: radius * 1000 // Convert km to meters
+        $geoWithin: {
+          $centerSphere: [
+            [parseFloat(params.longitude), parseFloat(params.latitude)],
+            radius / EARTH_RADIUS_KM
+          ]
         }
       };
     }
