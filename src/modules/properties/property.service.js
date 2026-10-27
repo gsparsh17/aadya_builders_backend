@@ -99,6 +99,8 @@ class PropertyService {
       throw new AppError('User not found', 404, 'USER_NOT_FOUND');
     }
 
+    await this.normalizeProjectLink(propertyData, userId, user.role);
+
     // Listing limits: free users get FREE_LIMITS.OWNER_MAX_LISTINGS live or
     // pending listings; an active plan raises that to its listing limit.
     // Off unless ENFORCE_LISTING_LIMITS=true, so it can be switched on once
@@ -164,6 +166,26 @@ class PropertyService {
       .catch(err => logger.error('Failed to send property created email:', err));
 
     return property;
+  }
+
+  /**
+   * A listing can be shown under a project's units only if the poster owns
+   * that project (admins excepted). Empty values unlink it.
+   */
+  async normalizeProjectLink(data, userId, role) {
+    if (!('project' in data)) return;
+    if (!data.project) {
+      data.project = null;
+      return;
+    }
+    const Project = require('../projects/project.model');
+    const project = await Project.findById(data.project).select('builder');
+    if (!project) {
+      throw new AppError('Project not found', 404, 'PROJECT_NOT_FOUND');
+    }
+    if (role !== 'admin' && project.builder.toString() !== userId.toString()) {
+      throw new AppError('You can only add listings to your own projects', 403, 'FORBIDDEN');
+    }
   }
 
   /**
@@ -247,6 +269,8 @@ class PropertyService {
     // Fields that cannot be updated
     const restrictedFields = ['propertyCode', 'owner', 'ownerType', 'isVerified', 'views', 'leads', 'rankingScore'];
     restrictedFields.forEach(field => delete updateData[field]);
+
+    await this.normalizeProjectLink(updateData, userId, userRole);
 
     // If address changed, re-geocode
     if (updateData.location && (updateData.location.address || updateData.location.city)) {

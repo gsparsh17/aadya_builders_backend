@@ -51,6 +51,10 @@ const propertyValidation = {
       .optional()
       .isIn(['furnished', 'semi_furnished', 'unfurnished'])
       .withMessage('Invalid furnishing status'),
+
+    body('project')
+      .optional({ values: 'falsy' })
+      .isMongoId().withMessage('Invalid project'),
     
     body('location.address')
       .notEmpty().withMessage('Address is required')
