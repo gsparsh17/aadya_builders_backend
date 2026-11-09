@@ -18,7 +18,9 @@
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
     "docker:logs": "docker-compose logs -f",
-    "seed:plans": "node scripts/seed-plans.js"
+    "seed:plans": "node scripts/seed-plans.js",
+    "seed:samples": "node scripts/seed-samples.js",
+    "seed:samples:remove": "node scripts/seed-samples.js --remove"
   },
   "engines": {
     "node": ">=18.0.0",

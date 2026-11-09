@@ -20,13 +20,20 @@ exports.getLayoutDetails = async (req, res) => {
     const layout = await Layout.findById(layoutId);
     if (!layout) return res.status(404).json({ success: false, message: 'Layout not found' });
     
-    // Fetch all plots associated with this layout
+    // Release holds that have run out before reporting availability
+    await releaseExpiredHolds({ layoutId });
     const plots = await Plot.find({ layoutId });
     res.status(200).json({ success: true, data: { layout, plots } });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };
+
+const releaseExpiredHolds = (filter) =>
+  Plot.updateMany(
+    { ...filter, status: 'locked', lockedUntil: { $lt: new Date() } },
+    { status: 'available', lockedBy: null, lockedUntil: null }
+  );
 
 // Internal helper for socket emission
 const emitPlotUpdate = (req, plotId, status, lockedBy) => {
@@ -53,7 +60,8 @@ exports.lockPlot = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Plot is already booked' });
     }
     
-    if (plot.status === 'locked' && plot.lockedBy.toString() !== userId.toString()) {
+    const holdActive = plot.lockedUntil && plot.lockedUntil > new Date();
+    if (plot.status === 'locked' && holdActive && plot.lockedBy && plot.lockedBy.toString() !== userId.toString()) {
       return res.status(400).json({ success: false, message: 'Plot is currently held by someone else. Please try again later.' });
     }
     

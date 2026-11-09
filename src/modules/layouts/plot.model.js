@@ -18,7 +18,9 @@ const plotSchema = new mongoose.Schema({
   area: { type: Number },
   // Information about locking
   lockedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
-  lockedUntil: { type: Date, default: null, index: { expireAfterSeconds: 0 } }, // TTL index for automatic unlocking
+  // Expired holds are released lazily by the layout controller. (A TTL index
+  // here would delete the whole plot document, not just the hold.)
+  lockedUntil: { type: Date, default: null },
   // Information about booking
   bookedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   createdAt: { type: Date, default: Date.now },
